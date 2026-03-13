@@ -2,6 +2,7 @@ package parallel_test
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sort"
 	"testing"
@@ -126,4 +127,51 @@ func TestWorkerPoolMap_EarlyStop(t *testing.T) {
 	if count != 10 {
 		t.Fatalf("expected 10, got %d", count)
 	}
+}
+
+func ExampleParallelMap() {
+	numbers := slices.Values([]int{1, 2, 3})
+
+	for v := range parallel.ParallelMap(context.Background(), numbers, func(n int) int {
+		return n * 2
+	}, 1) {
+		fmt.Println(v)
+	}
+	// Output:
+	// 2
+	// 4
+	// 6
+}
+
+func ExampleBatchMap() {
+	numbers := slices.Values([]int{1, 2, 3, 4})
+
+	for v := range parallel.BatchMap(context.Background(), numbers, func(batch []int) []int {
+		out := make([]int, len(batch))
+		for i, n := range batch {
+			out[i] = n * 10
+		}
+		return out
+	}, 2) {
+		fmt.Println(v)
+	}
+	// Output:
+	// 10
+	// 20
+	// 30
+	// 40
+}
+
+func ExampleWorkerPoolMap() {
+	numbers := slices.Values([]int{1, 2, 3})
+
+	for v := range parallel.WorkerPoolMap(context.Background(), numbers, func(n int) int {
+		return n * 3
+	}, 1) {
+		fmt.Println(v)
+	}
+	// Output:
+	// 3
+	// 6
+	// 9
 }

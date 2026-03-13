@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"fmt"
 	"io"
 	"sync"
 	"testing"
@@ -168,4 +169,49 @@ func TestDBRowsWithArgs_Cancelled(t *testing.T) {
 	if queryArgsCount != 0 {
 		t.Fatalf("expected query not to run on cancelled context, got %d calls", queryArgsCount)
 	}
+}
+
+func openExampleDB() (*sql.DB, error) {
+	registerStubDriver.Do(func() {
+		sql.Register("vortex_stub", stubDriver{})
+	})
+
+	return sql.Open("vortex_stub", "")
+}
+
+func ExampleDBRows() {
+	db, err := openExampleDB()
+	if err != nil {
+		return
+	}
+	defer db.Close()
+
+	for name := range sources.DBRows(context.Background(), db, "SELECT name FROM users", func(rows *sql.Rows) (string, error) {
+		var name string
+		return name, rows.Scan(&name)
+	}) {
+		fmt.Println(name)
+	}
+	// Output:
+	// alice
+	// bob
+}
+
+func ExampleDBRowsWithArgs() {
+	db, err := openExampleDB()
+	if err != nil {
+		return
+	}
+	defer db.Close()
+
+	for value := range sources.DBRowsWithArgs(context.Background(), db, "SELECT value FROM numbers WHERE kind = ?", []any{"even"}, func(rows *sql.Rows) (int, error) {
+		var value int
+		return value, rows.Scan(&value)
+	}) {
+		fmt.Println(value)
+	}
+	// Output:
+	// 1
+	// 2
+	// 3
 }

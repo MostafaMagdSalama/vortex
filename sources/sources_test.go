@@ -3,6 +3,7 @@ package sources_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -211,4 +212,106 @@ func TestStdin_Cancelled(t *testing.T) {
 	if count != 0 {
 		t.Fatalf("expected 0 results on cancelled context, got %d", count)
 	}
+}
+
+func ExampleCSVRows() {
+	input := strings.NewReader("name,age\nAlice,30\nBob,25\n")
+
+	for row := range sources.CSVRows(context.Background(), input) {
+		fmt.Println(row[0], row[1])
+	}
+	// Output:
+	// name age
+	// Alice 30
+	// Bob 25
+}
+
+func ExampleCSVRowsWithError() {
+	input := strings.NewReader("name,age\nAlice,30\nBob,25\n")
+
+	for row, err := range sources.CSVRowsWithError(context.Background(), input) {
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
+		fmt.Println(row[0], row[1])
+	}
+	// Output:
+	// name age
+	// Alice 30
+	// Bob 25
+}
+
+func ExampleLines() {
+	input := strings.NewReader("line1\nline2\nline3\n")
+
+	for line := range sources.Lines(context.Background(), input) {
+		fmt.Println(line)
+	}
+	// Output:
+	// line1
+	// line2
+	// line3
+}
+
+func ExampleLinesWithError() {
+	input := strings.NewReader("line1\nline2\n")
+
+	for line, err := range sources.LinesWithError(context.Background(), input) {
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
+		fmt.Println(line)
+	}
+	// Output:
+	// line1
+	// line2
+}
+
+func ExampleFileLines() {
+	for line := range sources.FileLines(context.Background(), filepath.Join("testdata", "sample.txt")) {
+		fmt.Println(line)
+	}
+	// Output:
+	// hello\nworld\nfoo
+}
+
+func ExampleFileLinesWithError() {
+	for line, err := range sources.FileLinesWithError(context.Background(), filepath.Join("testdata", "sample.txt")) {
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
+		fmt.Println(line)
+	}
+	// Output:
+	// hello\nworld\nfoo
+}
+
+func ExampleStdin() {
+	tmpFile, err := os.CreateTemp("", "vortex-stdin-example-*")
+	if err != nil {
+		return
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+
+	if _, err := tmpFile.WriteString("one\ntwo\n"); err != nil {
+		return
+	}
+	if _, err := tmpFile.Seek(0, 0); err != nil {
+		return
+	}
+
+	oldStdin := os.Stdin
+	os.Stdin = tmpFile
+	defer func() { os.Stdin = oldStdin }()
+
+	for line := range sources.Stdin(context.Background()) {
+		fmt.Println(line)
+	}
+	// Output:
+	// one
+	// two
 }
