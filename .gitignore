@@ -1,0 +1,36 @@
+# binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# test binaries
+*.test
+*.out
+
+# go build cache
+/vendor/
+/dist/
+
+# dependency directories
+go.sum.bak
+
+# environment files
+.env
+.env.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.DS_Store
+
+# profiling
+*.prof
+*.pprof
+
+# coverage
+coverage.out
+cove
