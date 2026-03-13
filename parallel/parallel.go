@@ -4,7 +4,7 @@ import (
 	"iter"
 	"sync"
 
-	"vortex/internal/sched"
+	"github.com/MostafaMagdSalama/vortex/internal/sched"
 )
 
 // ParallelMap processes each element concurrently with n workers.

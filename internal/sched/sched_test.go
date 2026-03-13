@@ -4,7 +4,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"vortex/internal/sched"
+	"github.com/MostafaMagdSalama/vortex/internal/sched"
 )
 
 func TestScheduler(t *testing.T) {

@@ -4,7 +4,7 @@ import (
     "slices"
     "testing"
 
-    "vortex/iter"
+    "github.com/MostafaMagdSalama/vortex/iter"
 )
 
 func TestFilter(t *testing.T) {

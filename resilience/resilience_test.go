@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"vortex/resilience"
+	"github.com/MostafaMagdSalama/vortex/resilience"
 )
 
 func TestRetry(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"testing"
 
-	"vortex/parallel"
+	"github.com/MostafaMagdSalama/vortex/parallel"
 )
 
 func TestParallelMap(t *testing.T) {
