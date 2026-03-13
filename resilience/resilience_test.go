@@ -3,7 +3,10 @@ package resilience_test
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/MostafaMagdSalama/vortex/resilience"
 )
@@ -47,5 +50,41 @@ func TestCircuitBreaker(t *testing.T) {
 
 	if !errors.Is(err, resilience.ErrCircuitOpen) {
 		t.Fatalf("expected circuit open error, got %v", err)
+	}
+}
+
+func TestCircuitBreaker_HalfOpenOnlyOneRequest(t *testing.T) {
+	// opens immediately after 1 failure, recovers after 0 timeout
+	cb := resilience.NewCircuitBreaker(1, 0)
+
+	// trip the breaker
+	cb.Execute(func() error {
+		return errors.New("fail")
+	})
+
+	// wait for timeout to pass
+	time.Sleep(10 * time.Millisecond)
+
+	// fire two concurrent requests in half-open window
+	var trialCount atomic.Int64
+	var wg sync.WaitGroup
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cb.Execute(func() error {
+				trialCount.Add(1)
+				time.Sleep(50 * time.Millisecond) // hold the slot open
+				return nil
+			})
+		}()
+	}
+
+	wg.Wait()
+
+	// only ONE trial request should have run
+	if trialCount.Load() != 1 {
+		t.Fatalf("expected 1 trial request, got %d", trialCount.Load())
 	}
 }

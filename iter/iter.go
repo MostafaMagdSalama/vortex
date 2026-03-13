@@ -2,6 +2,17 @@ package iter
 
 import "iter"
 
+type ValidationError[T any] struct {
+    Item   T      // the actual item that failed — e.g. the User struct
+    Reason string // why it failed — e.g. "missing ID"
+}
+
+// ValidateConfig controls what happens with invalid items.
+type ValidateConfig[T any] struct {
+	OnError func(ValidationError[T]) // called for each invalid item
+}
+
+
 // Filter returns a new sequence containing only elements where fn returns true.
 // Nothing runs until the caller does `for range`.
 func Filter[T any](seq iter.Seq[T], fn func(T) bool) iter.Seq[T] {
@@ -74,4 +85,22 @@ func TakeWhile[T any](seq iter.Seq[T], fn func(T) bool) iter.Seq[T] {
             }
         }
     }
+}
+
+
+func Validate[T any](seq iter.Seq[T], fn func(T) (bool, string), onError func(ValidationError[T])) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for item := range seq {
+			ok, reason := fn(item)
+			if !ok {
+				if onError != nil {
+					onError(ValidationError[T]{Item: item, Reason: reason})
+				}
+				continue
+			}
+			if !yield(item) {
+				return
+			}
+		}
+	}
 }

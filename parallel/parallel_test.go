@@ -57,3 +57,46 @@ func TestWorkerPoolMap(t *testing.T) {
 		t.Fatalf("got %v", results)
 	}
 }
+
+func TestParallelMap_EarlyStop(t *testing.T) {
+	// large input so workers are definitely still running when we stop
+	input := slices.Values(make([]int, 10000))
+
+	count := 0
+	for range parallel.ParallelMap(
+		input,
+		func(n int) int { return n * 2 },
+		8,
+	) {
+		count++
+		if count == 10 {
+			break // stop early
+		}
+	}
+
+	if count != 10 {
+		t.Fatalf("expected 10, got %d", count)
+	}
+	// if deadlock occurs, test will hang forever and timeout
+}
+
+
+func TestWorkerPoolMap_EarlyStop(t *testing.T) {
+	input := make([]int, 10000)
+
+	count := 0
+	for range parallel.WorkerPoolMap(
+		slices.Values(input),
+		func(n int) int { return n * 2 },
+		8,
+	) {
+		count++
+		if count == 10 {
+			break
+		}
+	}
+
+	if count != 10 {
+		t.Fatalf("expected 10, got %d", count)
+	}
+}

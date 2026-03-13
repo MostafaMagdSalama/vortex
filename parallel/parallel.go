@@ -1,44 +1,59 @@
 package parallel
 
 import (
+	"context"
 	"iter"
 	"sync"
 
-	"github.com/MostafaMagdSalama/vortex/internal/sched"
 )
 
 // ParallelMap processes each element concurrently with n workers.
 // Output order is NOT guaranteed — results arrive as workers finish.
 func ParallelMap[T, U any](seq iter.Seq[T], fn func(T) U, workers int) iter.Seq[U] {
 	return func(yield func(U) bool) {
-		s := sched.New(workers)
+		jobs := make(chan T, workers)
 		results := make(chan U, workers*2)
-		var mu sync.Mutex
-		stopped := false
+		var wg sync.WaitGroup
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-		// producer: submit all items as tasks
-		go func() {
-			for v := range seq {
-				v := v
-				s.Submit(func() {
-					result := fn(v)
-					mu.Lock()
-					if !stopped {
-						results <- result
+		// start fixed workers
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for v := range jobs {
+					select {
+					case results <- fn(v):  // send result
+					case <-ctx.Done():       // caller stopped — exit cleanly
+						return
 					}
-					mu.Unlock()
-				})
+				}
+			}()
+		}
+
+		// producer
+		go func() {
+			defer close(jobs)
+			for v := range seq {
+				select {
+				case jobs <- v:       // send job
+				case <-ctx.Done():    // caller stopped — stop feeding jobs
+					return
+				}
 			}
-			s.Stop()       // wait for all tasks
-			close(results) // signal consumer we're done
 		}()
 
-		// consumer: yield results to caller
+		// close results when all workers finish
+		go func() {
+			wg.Wait()
+			close(results)
+		}()
+
+		// consumer
 		for result := range results {
 			if !yield(result) {
-				mu.Lock()
-				stopped = true
-				mu.Unlock()
+				cancel() // signal all goroutines to stop
 				return
 			}
 		}
@@ -84,6 +99,8 @@ func WorkerPoolMap[T, U any](seq iter.Seq[T], fn func(T) U, workers int) iter.Se
 		tasks := make(chan T, workers*2)
 		results := make(chan U, workers*2)
 		var wg sync.WaitGroup
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		// start fixed worker goroutines
 		for i := 0; i < workers; i++ {
@@ -91,7 +108,11 @@ func WorkerPoolMap[T, U any](seq iter.Seq[T], fn func(T) U, workers int) iter.Se
 			go func() {
 				defer wg.Done()
 				for v := range tasks {
-					results <- fn(v)
+					select {
+					case results <- fn(v): // send result
+					case <-ctx.Done():      // caller stopped — exit cleanly
+						return
+					}
 				}
 			}()
 		}
@@ -104,15 +125,20 @@ func WorkerPoolMap[T, U any](seq iter.Seq[T], fn func(T) U, workers int) iter.Se
 
 		// feed items into tasks channel
 		go func() {
+			defer close(tasks)
 			for v := range seq {
-				tasks <- v
+				select {
+				case tasks <- v:    // send task
+				case <-ctx.Done(): // caller stopped — stop feeding
+					return
+				}
 			}
-			close(tasks) // signal workers no more work
 		}()
 
 		// yield results to caller
 		for result := range results {
 			if !yield(result) {
+				cancel() // signal all goroutines to stop
 				return
 			}
 		}
