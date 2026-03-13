@@ -1,6 +1,7 @@
 package parallel_test
 
 import (
+	"context"
 	"slices"
 	"sort"
 	"testing"
@@ -12,15 +13,27 @@ func TestParallelMap(t *testing.T) {
 	input := slices.Values([]int{1, 2, 3, 4, 5})
 
 	var results []int
-	for v := range parallel.ParallelMap(input, func(n int) int { return n * 2 }, 3) {
+	for v := range parallel.ParallelMap(context.Background(), input, func(n int) int { return n * 2 }, 3) {
 		results = append(results, v)
 	}
 
-	// sort because order is not guaranteed
 	sort.Ints(results)
-
-	if len(results) != 5 || results[0] != 2 || results[4] != 10 {
+	if !slices.Equal(results, []int{2, 4, 6, 8, 10}) {
 		t.Fatalf("got %v", results)
+	}
+}
+
+func TestParallelMap_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var results []int
+	for v := range parallel.ParallelMap(ctx, slices.Values([]int{1, 2, 3, 4, 5}), func(n int) int { return n * 2 }, 3) {
+		results = append(results, v)
+	}
+
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results on cancelled context, got %d", len(results))
 	}
 }
 
@@ -28,18 +41,34 @@ func TestBatchMap(t *testing.T) {
 	input := slices.Values([]int{1, 2, 3, 4, 5})
 
 	var results []int
-	for v := range parallel.BatchMap(input, func(batch []int) []int {
+	for v := range parallel.BatchMap(context.Background(), input, func(batch []int) []int {
 		out := make([]int, len(batch))
-		for i, v := range batch {
-			out[i] = v * 2
+		for i, value := range batch {
+			out[i] = value * 2
 		}
 		return out
 	}, 2) {
 		results = append(results, v)
 	}
 
-	if len(results) != 5 {
+	if !slices.Equal(results, []int{2, 4, 6, 8, 10}) {
 		t.Fatalf("got %v", results)
+	}
+}
+
+func TestBatchMap_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var results []int
+	for v := range parallel.BatchMap(ctx, slices.Values([]int{1, 2, 3, 4, 5}), func(batch []int) []int {
+		return batch
+	}, 2) {
+		results = append(results, v)
+	}
+
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results on cancelled context, got %d", len(results))
 	}
 }
 
@@ -47,49 +76,47 @@ func TestWorkerPoolMap(t *testing.T) {
 	input := slices.Values([]int{1, 2, 3, 4, 5})
 
 	var results []int
-	for v := range parallel.WorkerPoolMap(input, func(n int) int { return n * 2 }, 3) {
+	for v := range parallel.WorkerPoolMap(context.Background(), input, func(n int) int { return n * 2 }, 3) {
 		results = append(results, v)
 	}
 
 	sort.Ints(results)
-
-	if len(results) != 5 || results[0] != 2 || results[4] != 10 {
+	if !slices.Equal(results, []int{2, 4, 6, 8, 10}) {
 		t.Fatalf("got %v", results)
 	}
 }
 
-func TestParallelMap_EarlyStop(t *testing.T) {
-	// large input so workers are definitely still running when we stop
-	input := slices.Values(make([]int, 10000))
+func TestWorkerPoolMap_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
 
+	var results []int
+	for v := range parallel.WorkerPoolMap(ctx, slices.Values([]int{1, 2, 3, 4, 5}), func(n int) int { return n * 2 }, 3) {
+		results = append(results, v)
+	}
+
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results on cancelled context, got %d", len(results))
+	}
+}
+
+func TestParallelMap_EarlyStop(t *testing.T) {
 	count := 0
-	for range parallel.ParallelMap(
-		input,
-		func(n int) int { return n * 2 },
-		8,
-	) {
+	for range parallel.ParallelMap(context.Background(), slices.Values(make([]int, 10000)), func(n int) int { return n * 2 }, 8) {
 		count++
 		if count == 10 {
-			break // stop early
+			break
 		}
 	}
 
 	if count != 10 {
 		t.Fatalf("expected 10, got %d", count)
 	}
-	// if deadlock occurs, test will hang forever and timeout
 }
 
-
 func TestWorkerPoolMap_EarlyStop(t *testing.T) {
-	input := make([]int, 10000)
-
 	count := 0
-	for range parallel.WorkerPoolMap(
-		slices.Values(input),
-		func(n int) int { return n * 2 },
-		8,
-	) {
+	for range parallel.WorkerPoolMap(context.Background(), slices.Values(make([]int, 10000)), func(n int) int { return n * 2 }, 8) {
 		count++
 		if count == 10 {
 			break

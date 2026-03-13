@@ -1,96 +1,138 @@
 package iter
 
-import "iter"
+import (
+	"context"
+	"iter"
+)
 
 type ValidationError[T any] struct {
-    Item   T      // the actual item that failed — e.g. the User struct
-    Reason string // why it failed — e.g. "missing ID"
+	Item   T
+	Reason string
 }
 
 // ValidateConfig controls what happens with invalid items.
 type ValidateConfig[T any] struct {
-	OnError func(ValidationError[T]) // called for each invalid item
+	OnError func(ValidationError[T])
 }
 
-
 // Filter returns a new sequence containing only elements where fn returns true.
-// Nothing runs until the caller does `for range`.
-func Filter[T any](seq iter.Seq[T], fn func(T) bool) iter.Seq[T] {
-    return func(yield func(T) bool) {
-        for v := range seq {
-            if fn(v) {
-                if !yield(v) {
-                    return // caller broke out of the loop — stop early
-                }
-            }
-        }
-    }
+func Filter[T any](ctx context.Context, seq iter.Seq[T], fn func(T) bool) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for v := range seq {
+			if ctx.Err() != nil {
+				return
+			}
+			if fn(v) && !yield(v) {
+				return
+			}
+		}
+	}
 }
 
 // Map transforms each element using fn.
-func Map[T, U any](seq iter.Seq[T], fn func(T) U) iter.Seq[U] {
-    return func(yield func(U) bool) {
-        for v := range seq {
-            if !yield(fn(v)) {
-                return
-            }
-        }
-    }
+func Map[T, U any](ctx context.Context, seq iter.Seq[T], fn func(T) U) iter.Seq[U] {
+	return func(yield func(U) bool) {
+		for v := range seq {
+			if ctx.Err() != nil {
+				return
+			}
+			if !yield(fn(v)) {
+				return
+			}
+		}
+	}
 }
 
 // Take returns the first n elements.
-func Take[T any](seq iter.Seq[T], n int) iter.Seq[T] {
-    return func(yield func(T) bool) {
-        i := 0
-        for v := range seq {
-            if i >= n {
-                return
-            }
-            if !yield(v) {
-                return
-            }
-            i++
-        }
-    }
+func Take[T any](ctx context.Context, seq iter.Seq[T], n int) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		i := 0
+		for v := range seq {
+			if ctx.Err() != nil {
+				return
+			}
+			if i >= n {
+				return
+			}
+			if !yield(v) {
+				return
+			}
+			i++
+		}
+	}
 }
 
-// FlatMap transforms each element into a sequence, then flattens
-// all sequences into one.
-//
-// example:
-// input:  [1, 2, 3]
-// fn:     n -> [n, n*10]
-// output: [1, 10, 2, 20, 3, 30]
-func FlatMap[T, U any](seq iter.Seq[T], fn func(T) iter.Seq[U]) iter.Seq[U] {
-    return func(yield func(U) bool) {
-        for v := range seq {
-            // fn returns a sequence — range over it
-            for inner := range fn(v) {
-                if !yield(inner) {
-                    return // caller stopped, exit everything
-                }
-            }
-        }
-    }
+// FlatMap transforms each element into a sequence, then flattens all sequences.
+func FlatMap[T, U any](ctx context.Context, seq iter.Seq[T], fn func(T) iter.Seq[U]) iter.Seq[U] {
+	return func(yield func(U) bool) {
+		for v := range seq {
+			if ctx.Err() != nil {
+				return
+			}
+			for inner := range fn(v) {
+				if ctx.Err() != nil {
+					return
+				}
+				if !yield(inner) {
+					return
+				}
+			}
+		}
+	}
 }
 
-func TakeWhile[T any](seq iter.Seq[T], fn func(T) bool) iter.Seq[T] {
-    return func(yield func(T) bool) {
-        for v := range seq {
-            if !fn(v) {
-                return // condition failed — stop
-            }
-            if !yield(v) {
-                return // caller stopped — stop
-            }
-        }
-    }
+func TakeWhile[T any](ctx context.Context, seq iter.Seq[T], fn func(T) bool) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for v := range seq {
+			if ctx.Err() != nil {
+				return
+			}
+			if !fn(v) {
+				return
+			}
+			if !yield(v) {
+				return
+			}
+		}
+	}
 }
 
+func Zip[A, B any](ctx context.Context, a iter.Seq[A], b iter.Seq[B]) iter.Seq[[2]any] {
+	return func(yield func([2]any) bool) {
+		nextA, stopA := iter.Pull(a)
+		defer stopA()
 
-func Validate[T any](seq iter.Seq[T], fn func(T) (bool, string), onError func(ValidationError[T])) iter.Seq[T] {
+		nextB, stopB := iter.Pull(b)
+		defer stopB()
+
+		for {
+			if ctx.Err() != nil {
+				return
+			}
+
+			va, okA := nextA()
+			if !okA {
+				return
+			}
+
+			vb, okB := nextB()
+			if !okB {
+				return
+			}
+
+			if !yield([2]any{va, vb}) {
+				return
+			}
+		}
+	}
+}
+
+func Validate[T any](ctx context.Context, seq iter.Seq[T], fn func(T) (bool, string), onError func(ValidationError[T])) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for item := range seq {
+			if ctx.Err() != nil {
+				return
+			}
 			ok, reason := fn(item)
 			if !ok {
 				if onError != nil {

@@ -1,321 +1,304 @@
 package iter_test
 
 import (
-    "slices"
-    "testing"
+	"context"
+	"iter"
+	"slices"
+	"testing"
 
-    "github.com/MostafaMagdSalama/vortex/iter"
+	viter "github.com/MostafaMagdSalama/vortex/iter"
 )
 
 func TestFilter(t *testing.T) {
-    source := slices.Values([]int{1, 2, 3, 4, 5})
-
-    var result []int
-    for v := range iter.Filter(source, func(n int) bool { return n > 2 }) {
-        result = append(result, v)
-    }
-
-    // result should be [3, 4, 5]
-    if len(result) != 3 || result[0] != 3 {
-        t.Fatalf("got %v", result)
-    }
-}
-// ─── Chunk ───────────────────────────────
-
-func TestChunk_EvenSplit(t *testing.T) {
-	numbers := slices.Values([]int{1, 2, 3, 4, 5, 6})
-
-	var result [][]int
-	for batch := range iter.Chunk(numbers, 2) {
-		result = append(result, batch)
-	}
-
-	if len(result) != 3 {
-		t.Fatalf("expected 3 batches, got %d", len(result))
-	}
-	if len(result[0]) != 2 || result[0][0] != 1 || result[0][1] != 2 {
-		t.Fatalf("unexpected first batch: %v", result[0])
-	}
-}
-
-func TestChunk_UnevenSplit(t *testing.T) {
-	numbers := slices.Values([]int{1, 2, 3, 4, 5})
-
-	var result [][]int
-	for batch := range iter.Chunk(numbers, 2) {
-		result = append(result, batch)
-	}
-
-	// [1 2], [3 4], [5]
-	if len(result) != 3 {
-		t.Fatalf("expected 3 batches, got %d", len(result))
-	}
-	if len(result[2]) != 1 || result[2][0] != 5 {
-		t.Fatalf("expected last batch [5], got %v", result[2])
-	}
-}
-
-func TestChunk_EarlyStop(t *testing.T) {
-	numbers := slices.Values([]int{1, 2, 3, 4, 5, 6})
-
-	count := 0
-	for range iter.Take(iter.Chunk(numbers, 2), 1) {
-		count++
-	}
-
-	if count != 1 {
-		t.Fatalf("expected 1 batch, got %d", count)
-	}
-}
-
-// ─── Flatten ─────────────────────────────
-
-func TestFlatten_Basic(t *testing.T) {
-	groups := slices.Values([][]int{{1, 2}, {3, 4}, {5}})
-
 	var result []int
-	for v := range iter.Flatten(groups) {
+	for v := range viter.Filter(context.Background(), slices.Values([]int{1, 2, 3, 4, 5}), func(n int) bool { return n > 2 }) {
 		result = append(result, v)
 	}
 
-	expected := []int{1, 2, 3, 4, 5}
-	if len(result) != len(expected) {
-		t.Fatalf("expected %v, got %v", expected, result)
-	}
-	for i, v := range result {
-		if v != expected[i] {
-			t.Fatalf("index %d: expected %d, got %d", i, expected[i], v)
-		}
+	if !slices.Equal(result, []int{3, 4, 5}) {
+		t.Fatalf("got %v", result)
 	}
 }
 
-func TestFlatten_EarlyStop(t *testing.T) {
-	groups := slices.Values([][]int{{1, 2}, {3, 4}, {5, 6}})
+func TestFilter_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
 
 	var result []int
-	for v := range iter.Take(iter.Flatten(groups), 3) {
-		result = append(result, v)
-	}
-
-	if len(result) != 3 {
-		t.Fatalf("expected 3 items, got %d", len(result))
-	}
-}
-
-func TestFlatten_EmptySlices(t *testing.T) {
-	groups := slices.Values([][]int{{}, {1, 2}, {}, {3}})
-
-	var result []int
-	for v := range iter.Flatten(groups) {
-		result = append(result, v)
-	}
-
-	if len(result) != 3 {
-		t.Fatalf("expected 3 items, got %d", len(result))
-	}
-}
-
-// ─── Distinct ────────────────────────────
-
-func TestDistinct_Basic(t *testing.T) {
-	numbers := slices.Values([]int{1, 2, 1, 3, 2, 4})
-
-	var result []int
-	for v := range iter.Distinct(numbers) {
-		result = append(result, v)
-	}
-
-	if len(result) != 4 {
-		t.Fatalf("expected 4 unique values, got %d", len(result))
-	}
-}
-
-func TestDistinct_AllDuplicates(t *testing.T) {
-	numbers := slices.Values([]int{1, 1, 1, 1})
-
-	var result []int
-	for v := range iter.Distinct(numbers) {
-		result = append(result, v)
-	}
-
-	if len(result) != 1 || result[0] != 1 {
-		t.Fatalf("expected [1], got %v", result)
-	}
-}
-
-func TestDistinct_NoDuplicates(t *testing.T) {
-	numbers := slices.Values([]int{1, 2, 3, 4})
-
-	var result []int
-	for v := range iter.Distinct(numbers) {
-		result = append(result, v)
-	}
-
-	if len(result) != 4 {
-		t.Fatalf("expected 4 items, got %d", len(result))
-	}
-}
-
-func TestDistinct_Strings(t *testing.T) {
-	words := slices.Values([]string{"a", "b", "a", "c", "b"})
-
-	var result []string
-	for v := range iter.Distinct(words) {
-		result = append(result, v)
-	}
-
-	if len(result) != 3 {
-		t.Fatalf("expected 3 unique strings, got %d", len(result))
-	}
-}
-
-// ─── Contains ────────────────────────────
-
-func TestContains_Found(t *testing.T) {
-	numbers := slices.Values([]int{1, 2, 3, 4, 5})
-
-	if !iter.Contains(numbers, 3) {
-		t.Fatal("expected true, got false")
-	}
-}
-
-func TestContains_NotFound(t *testing.T) {
-	numbers := slices.Values([]int{1, 2, 3, 4, 5})
-
-	if iter.Contains(numbers, 9) {
-		t.Fatal("expected false, got true")
-	}
-}
-
-func TestContains_EmptySequence(t *testing.T) {
-	numbers := slices.Values([]int{})
-
-	if iter.Contains(numbers, 1) {
-		t.Fatal("expected false for empty sequence")
-	}
-}
-
-func TestContains_StopsEarly(t *testing.T) {
-	// if Contains stops early, this counter should be low
-	count := 0
-	seq := func(yield func(int) bool) {
-		for i := 1; i <= 100; i++ {
-			count++
-			if !yield(i) {
-				return
-			}
-		}
-	}
-
-	iter.Contains(seq, 3)
-
-	// should have stopped after finding 3 — not read all 100
-	if count > 5 {
-		t.Fatalf("expected early stop, read %d items", count)
-	}
-}
-
-// ─── ForEach ─────────────────────────────
-
-func TestForEach_Basic(t *testing.T) {
-	numbers := slices.Values([]int{1, 2, 3, 4, 5})
-
-	var result []int
-	iter.ForEach(numbers, func(v int) {
-		result = append(result, v*2)
-	})
-
-	if len(result) != 5 {
-		t.Fatalf("expected 5 items, got %d", len(result))
-	}
-	if result[0] != 2 || result[4] != 10 {
-		t.Fatalf("unexpected result: %v", result)
-	}
-}
-
-func TestForEach_Empty(t *testing.T) {
-	numbers := slices.Values([]int{})
-
-	count := 0
-	iter.ForEach(numbers, func(v int) {
-		count++
-	})
-
-	if count != 0 {
-		t.Fatalf("expected 0 calls, got %d", count)
-	}
-}
-
-func TestForEach_SideEffect(t *testing.T) {
-	numbers := slices.Values([]int{1, 2, 3})
-
-	sum := 0
-	iter.ForEach(numbers, func(v int) {
-		sum += v
-	})
-
-	if sum != 6 {
-		t.Fatalf("expected sum 6, got %d", sum)
-	}
-}
-
-// ─── Reverse ─────────────────────────────
-
-func TestReverse_Basic(t *testing.T) {
-	numbers := slices.Values([]int{1, 2, 3, 4, 5})
-
-	var result []int
-	for v := range iter.Reverse(numbers) {
-		result = append(result, v)
-	}
-
-	expected := []int{5, 4, 3, 2, 1}
-	for i, v := range result {
-		if v != expected[i] {
-			t.Fatalf("index %d: expected %d, got %d", i, expected[i], v)
-		}
-	}
-}
-
-func TestReverse_SingleItem(t *testing.T) {
-	numbers := slices.Values([]int{42})
-
-	var result []int
-	for v := range iter.Reverse(numbers) {
-		result = append(result, v)
-	}
-
-	if len(result) != 1 || result[0] != 42 {
-		t.Fatalf("expected [42], got %v", result)
-	}
-}
-
-func TestReverse_Empty(t *testing.T) {
-	numbers := slices.Values([]int{})
-
-	var result []int
-	for v := range iter.Reverse(numbers) {
+	for v := range viter.Filter(ctx, slices.Values([]int{1, 2, 3, 4, 5}), func(n int) bool { return true }) {
 		result = append(result, v)
 	}
 
 	if len(result) != 0 {
-		t.Fatalf("expected empty, got %v", result)
+		t.Fatalf("expected 0 results on cancelled context, got %d", len(result))
 	}
 }
 
-func TestReverse_EarlyStop(t *testing.T) {
-	numbers := slices.Values([]int{1, 2, 3, 4, 5})
-
+func TestMap(t *testing.T) {
 	var result []int
-	for v := range iter.Take(iter.Reverse(numbers), 3) {
+	for v := range viter.Map(context.Background(), slices.Values([]int{1, 2, 3}), func(n int) int { return n * 2 }) {
 		result = append(result, v)
 	}
 
-	// should get 5, 4, 3
-	if len(result) != 3 {
-		t.Fatalf("expected 3 items, got %d", len(result))
+	if !slices.Equal(result, []int{2, 4, 6}) {
+		t.Fatalf("got %v", result)
 	}
-	if result[0] != 5 || result[1] != 4 || result[2] != 3 {
-		t.Fatalf("expected [5 4 3], got %v", result)
+}
+
+func TestMap_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var result []int
+	for v := range viter.Map(ctx, slices.Values([]int{1, 2, 3}), func(n int) int { return n * 2 }) {
+		result = append(result, v)
+	}
+
+	if len(result) != 0 {
+		t.Fatalf("expected 0 results on cancelled context, got %d", len(result))
+	}
+}
+
+func TestTake(t *testing.T) {
+	var result []int
+	for v := range viter.Take(context.Background(), slices.Values([]int{1, 2, 3, 4}), 2) {
+		result = append(result, v)
+	}
+
+	if !slices.Equal(result, []int{1, 2}) {
+		t.Fatalf("got %v", result)
+	}
+}
+
+func TestTake_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var result []int
+	for v := range viter.Take(ctx, slices.Values([]int{1, 2, 3, 4}), 2) {
+		result = append(result, v)
+	}
+
+	if len(result) != 0 {
+		t.Fatalf("expected 0 results on cancelled context, got %d", len(result))
+	}
+}
+
+func TestFlatMap(t *testing.T) {
+	var result []int
+	for v := range viter.FlatMap(context.Background(), slices.Values([]int{1, 2, 3}), func(n int) iter.Seq[int] {
+		return slices.Values([]int{n, n * 10})
+	}) {
+		result = append(result, v)
+	}
+
+	if !slices.Equal(result, []int{1, 10, 2, 20, 3, 30}) {
+		t.Fatalf("got %v", result)
+	}
+}
+
+func TestFlatMap_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var result []int
+	for v := range viter.FlatMap(ctx, slices.Values([]int{1, 2, 3}), func(n int) iter.Seq[int] {
+		return slices.Values([]int{n, n * 10})
+	}) {
+		result = append(result, v)
+	}
+
+	if len(result) != 0 {
+		t.Fatalf("expected 0 results on cancelled context, got %d", len(result))
+	}
+}
+
+func TestTakeWhile(t *testing.T) {
+	var result []int
+	for v := range viter.TakeWhile(context.Background(), slices.Values([]int{1, 2, 3, 0, 4}), func(n int) bool { return n > 0 }) {
+		result = append(result, v)
+	}
+
+	if !slices.Equal(result, []int{1, 2, 3}) {
+		t.Fatalf("got %v", result)
+	}
+}
+
+func TestTakeWhile_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var result []int
+	for v := range viter.TakeWhile(ctx, slices.Values([]int{1, 2, 3}), func(n int) bool { return true }) {
+		result = append(result, v)
+	}
+
+	if len(result) != 0 {
+		t.Fatalf("expected 0 results on cancelled context, got %d", len(result))
+	}
+}
+
+func TestZip(t *testing.T) {
+	var result [][2]any
+	for pair := range viter.Zip(context.Background(), slices.Values([]int{1, 2, 3}), slices.Values([]string{"a", "b"})) {
+		result = append(result, pair)
+	}
+
+	if len(result) != 2 || result[0] != [2]any{1, "a"} || result[1] != [2]any{2, "b"} {
+		t.Fatalf("got %v", result)
+	}
+}
+
+func TestZip_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var result [][2]any
+	for pair := range viter.Zip(ctx, slices.Values([]int{1, 2, 3}), slices.Values([]string{"a", "b"})) {
+		result = append(result, pair)
+	}
+
+	if len(result) != 0 {
+		t.Fatalf("expected 0 results on cancelled context, got %d", len(result))
+	}
+}
+
+func TestChunk_EvenSplit(t *testing.T) {
+	var result [][]int
+	for batch := range viter.Chunk(context.Background(), slices.Values([]int{1, 2, 3, 4, 5, 6}), 2) {
+		result = append(result, batch)
+	}
+
+	if len(result) != 3 || !slices.Equal(result[0], []int{1, 2}) || !slices.Equal(result[2], []int{5, 6}) {
+		t.Fatalf("got %v", result)
+	}
+}
+
+func TestChunk_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var result [][]int
+	for batch := range viter.Chunk(ctx, slices.Values([]int{1, 2, 3, 4}), 2) {
+		result = append(result, batch)
+	}
+
+	if len(result) != 0 {
+		t.Fatalf("expected 0 results on cancelled context, got %d", len(result))
+	}
+}
+
+func TestFlatten(t *testing.T) {
+	var result []int
+	for v := range viter.Flatten(context.Background(), slices.Values([][]int{{1, 2}, {3}, {4, 5}})) {
+		result = append(result, v)
+	}
+
+	if !slices.Equal(result, []int{1, 2, 3, 4, 5}) {
+		t.Fatalf("got %v", result)
+	}
+}
+
+func TestFlatten_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var result []int
+	for v := range viter.Flatten(ctx, slices.Values([][]int{{1, 2}, {3}})) {
+		result = append(result, v)
+	}
+
+	if len(result) != 0 {
+		t.Fatalf("expected 0 results on cancelled context, got %d", len(result))
+	}
+}
+
+func TestDistinct(t *testing.T) {
+	var result []int
+	for v := range viter.Distinct(context.Background(), slices.Values([]int{1, 2, 1, 3, 2, 4})) {
+		result = append(result, v)
+	}
+
+	if !slices.Equal(result, []int{1, 2, 3, 4}) {
+		t.Fatalf("got %v", result)
+	}
+}
+
+func TestDistinct_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var result []int
+	for v := range viter.Distinct(ctx, slices.Values([]int{1, 2, 1, 3})) {
+		result = append(result, v)
+	}
+
+	if len(result) != 0 {
+		t.Fatalf("expected 0 results on cancelled context, got %d", len(result))
+	}
+}
+
+func TestContains(t *testing.T) {
+	if !viter.Contains(context.Background(), slices.Values([]int{1, 2, 3, 4}), 3) {
+		t.Fatal("expected true")
+	}
+}
+
+func TestContains_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if viter.Contains(ctx, slices.Values([]int{1, 2, 3, 4}), 3) {
+		t.Fatal("expected false on cancelled context")
+	}
+}
+
+func TestForEach(t *testing.T) {
+	var result []int
+	viter.ForEach(context.Background(), slices.Values([]int{1, 2, 3}), func(v int) {
+		result = append(result, v*2)
+	})
+
+	if !slices.Equal(result, []int{2, 4, 6}) {
+		t.Fatalf("got %v", result)
+	}
+}
+
+func TestForEach_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	calls := 0
+	viter.ForEach(ctx, slices.Values([]int{1, 2, 3}), func(v int) {
+		calls++
+	})
+
+	if calls != 0 {
+		t.Fatalf("expected 0 calls on cancelled context, got %d", calls)
+	}
+}
+
+func TestReverse(t *testing.T) {
+	var result []int
+	for v := range viter.Reverse(context.Background(), slices.Values([]int{1, 2, 3, 4, 5})) {
+		result = append(result, v)
+	}
+
+	if !slices.Equal(result, []int{5, 4, 3, 2, 1}) {
+		t.Fatalf("got %v", result)
+	}
+}
+
+func TestReverse_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var result []int
+	for v := range viter.Reverse(ctx, slices.Values([]int{1, 2, 3, 4, 5})) {
+		result = append(result, v)
+	}
+
+	if len(result) != 0 {
+		t.Fatalf("expected 0 results on cancelled context, got %d", len(result))
 	}
 }

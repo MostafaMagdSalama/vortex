@@ -4,65 +4,79 @@ import (
 	"context"
 	"iter"
 	"sync"
-
 )
 
 // ParallelMap processes each element concurrently with n workers.
-// Output order is NOT guaranteed — results arrive as workers finish.
-func ParallelMap[T, U any](seq iter.Seq[T], fn func(T) U, workers int) iter.Seq[U] {
+func ParallelMap[T, U any](ctx context.Context, seq iter.Seq[T], fn func(T) U, workers int) iter.Seq[U] {
 	return func(yield func(U) bool) {
+		if ctx.Err() != nil {
+			return
+		}
+
 		jobs := make(chan T, workers)
 		results := make(chan U, workers*2)
 		var wg sync.WaitGroup
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		// start fixed workers
 		for i := 0; i < workers; i++ {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				for v := range jobs {
+				for {
+					if ctx.Err() != nil {
+						return
+					}
+					v, ok := <-jobs
+					if !ok {
+						return
+					}
 					select {
-					case results <- fn(v):  // send result
-					case <-ctx.Done():       // caller stopped — exit cleanly
+					case results <- fn(v):
+					case <-ctx.Done():
 						return
 					}
 				}
 			}()
 		}
 
-		// producer
 		go func() {
 			defer close(jobs)
 			for v := range seq {
+				if ctx.Err() != nil {
+					return
+				}
 				select {
-				case jobs <- v:       // send job
-				case <-ctx.Done():    // caller stopped — stop feeding jobs
+				case jobs <- v:
+				case <-ctx.Done():
 					return
 				}
 			}
 		}()
 
-		// close results when all workers finish
 		go func() {
 			wg.Wait()
 			close(results)
 		}()
 
-		// consumer
-		for result := range results {
+		for {
+			if ctx.Err() != nil {
+				return
+			}
+			result, ok := <-results
+			if !ok {
+				return
+			}
 			if !yield(result) {
-				cancel() // signal all goroutines to stop
+				cancel()
 				return
 			}
 		}
 	}
 }
 
-// BatchMap groups items into batches of size n, processes each batch concurrently.
-// Useful when fn has a fixed overhead — better to amortize it across a batch.
-func BatchMap[T, U any](seq iter.Seq[T], fn func([]T) []U, batchSize int) iter.Seq[U] {
+// BatchMap groups items into batches of size n and processes each batch.
+func BatchMap[T, U any](ctx context.Context, seq iter.Seq[T], fn func([]T) []U, batchSize int) iter.Seq[U] {
 	return func(yield func(U) bool) {
 		var batch []T
 
@@ -70,9 +84,15 @@ func BatchMap[T, U any](seq iter.Seq[T], fn func([]T) []U, batchSize int) iter.S
 			if len(batch) == 0 {
 				return true
 			}
+			if ctx.Err() != nil {
+				return false
+			}
 			results := fn(batch)
-			batch = batch[:0] // reset but keep memory
+			batch = batch[:0]
 			for _, r := range results {
+				if ctx.Err() != nil {
+					return false
+				}
 				if !yield(r) {
 					return false
 				}
@@ -81,6 +101,9 @@ func BatchMap[T, U any](seq iter.Seq[T], fn func([]T) []U, batchSize int) iter.S
 		}
 
 		for v := range seq {
+			if ctx.Err() != nil {
+				return
+			}
 			batch = append(batch, v)
 			if len(batch) >= batchSize {
 				if !flush() {
@@ -88,57 +111,74 @@ func BatchMap[T, U any](seq iter.Seq[T], fn func([]T) []U, batchSize int) iter.S
 				}
 			}
 		}
-		flush() // process remaining items
+
+		flush()
 	}
 }
 
 // WorkerPoolMap uses a fixed pool of workers to process items.
-// Unlike ParallelMap, the pool is reused across calls — better for long-running streams.
-func WorkerPoolMap[T, U any](seq iter.Seq[T], fn func(T) U, workers int) iter.Seq[U] {
+func WorkerPoolMap[T, U any](ctx context.Context, seq iter.Seq[T], fn func(T) U, workers int) iter.Seq[U] {
 	return func(yield func(U) bool) {
+		if ctx.Err() != nil {
+			return
+		}
+
 		tasks := make(chan T, workers*2)
 		results := make(chan U, workers*2)
 		var wg sync.WaitGroup
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		// start fixed worker goroutines
 		for i := 0; i < workers; i++ {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				for v := range tasks {
+				for {
+					if ctx.Err() != nil {
+						return
+					}
+					v, ok := <-tasks
+					if !ok {
+						return
+					}
 					select {
-					case results <- fn(v): // send result
-					case <-ctx.Done():      // caller stopped — exit cleanly
+					case results <- fn(v):
+					case <-ctx.Done():
 						return
 					}
 				}
 			}()
 		}
 
-		// close results when all workers are done
 		go func() {
+			defer close(results)
 			wg.Wait()
-			close(results)
 		}()
 
-		// feed items into tasks channel
 		go func() {
 			defer close(tasks)
 			for v := range seq {
+				if ctx.Err() != nil {
+					return
+				}
 				select {
-				case tasks <- v:    // send task
-				case <-ctx.Done(): // caller stopped — stop feeding
+				case tasks <- v:
+				case <-ctx.Done():
 					return
 				}
 			}
 		}()
 
-		// yield results to caller
-		for result := range results {
+		for {
+			if ctx.Err() != nil {
+				return
+			}
+			result, ok := <-results
+			if !ok {
+				return
+			}
 			if !yield(result) {
-				cancel() // signal all goroutines to stop
+				cancel()
 				return
 			}
 		}

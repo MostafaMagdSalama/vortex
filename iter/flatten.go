@@ -1,19 +1,21 @@
 package iter
 
-import "iter"
+import (
+	"context"
+	"iter"
+)
 
 // Flatten converts a sequence of slices into a flat sequence of elements.
-//
-// example:
-//
-//	groups := slices.Values([][]int{{1, 2}, {3, 4}, {5}})
-//	for v := range iter.Flatten(groups) {
-//	    fmt.Println(v) // 1, 2, 3, 4, 5
-//	}
-func Flatten[T any](seq iter.Seq[[]T]) iter.Seq[T] {
+func Flatten[T any](ctx context.Context, seq iter.Seq[[]T]) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for slice := range seq {
+			if ctx.Err() != nil {
+				return
+			}
 			for _, v := range slice {
+				if ctx.Err() != nil {
+					return
+				}
 				if !yield(v) {
 					return
 				}
