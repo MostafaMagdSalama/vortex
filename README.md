@@ -24,7 +24,7 @@ Go 1.23 or later.
 
 ## Benchmarks
 
-Tested on 1,000,000 rows CSV file on Windows.
+### CSV file — 1,000,000 rows (Windows)
 
 | Approach | Peak memory | Notes |
 |---|---|---|
@@ -32,8 +32,6 @@ Tested on 1,000,000 rows CSV file on Windows.
 | Lazy (vortex) | 3 MB | one row at a time |
 
 **95x less memory** with lazy processing.
-
-Memory stays flat at ~3 MB regardless of file size:
 ```
 file size     eager peak     vortex peak
 ──────────    ──────────     ───────────
@@ -42,8 +40,32 @@ file size     eager peak     vortex peak
 100M rows    out of memory        3 MB
 ```
 
-The lazy approach processes one row at a time — memory is determined
-by the size of one row, not the size of the file.
+### Database — 1,000,000 rows (Windows)
+
+| Approach | Peak memory | Rows read | Notes |
+|---|---|---|---|
+| Eager (load all) | 247 MB | 1,000,000 | loads all rows before processing |
+| Lazy (vortex) | 397 KB | 10 | stops the moment it has what it needs |
+
+**636x less memory** with lazy processing.
+```
+without vortex:
+  memory after loading all rows:  134 MB
+  memory after filtering:         204 MB
+  memory after extracting names:  247 MB
+  rows loaded: 1,000,000
+
+with vortex:
+  memory after creating source:   393 KB
+  memory after defining filter:   393 KB
+  memory after defining map:      393 KB
+  memory after defining take:     393 KB
+  peak memory: 397 KB
+  rows read: 10 out of 1,000,000
+```
+
+The lazy approach stops reading from the database the moment
+it has enough results — it never touches the remaining 999,990 rows.
 
 ## Examples
 
@@ -80,7 +102,6 @@ for v := range parallel.ParallelMap(numbers, func(n int) int {
 ### Batch processing
 ```go
 for v := range parallel.BatchMap(numbers, func(batch []int) []int {
-    // process whole batch at once — good for API/DB calls
     results := make([]int, len(batch))
     for i, v := range batch {
         results[i] = v * 2
@@ -101,12 +122,35 @@ import (
 file, _ := os.Open("users.csv")
 defer file.Close()
 
-// reads one row at a time — works on files of any size
 for user := range iter.Filter(
     sources.CSVRows(file),
     func(row []string) bool { return row[3] == "active" },
 ) {
     fmt.Println(user)
+}
+```
+
+### Database pipeline
+```go
+import (
+    "github.com/MostafaMagdSalama/vortex/iter"
+    "github.com/MostafaMagdSalama/vortex/sources"
+)
+
+// reads one row at a time — stops as soon as Take is satisfied
+names := iter.Map(
+    iter.Take(
+        iter.Filter(
+            sources.DBRows(db, "SELECT id, name, email, status FROM users", scanUser),
+            func(u User) bool { return u.Status == "active" },
+        ),
+        5,
+    ),
+    func(u User) string { return u.Name },
+)
+
+for name := range names {
+    fmt.Println(name)
 }
 ```
 
