@@ -42,3 +42,36 @@ func Take[T any](seq iter.Seq[T], n int) iter.Seq[T] {
         }
     }
 }
+
+// FlatMap transforms each element into a sequence, then flattens
+// all sequences into one.
+//
+// example:
+// input:  [1, 2, 3]
+// fn:     n -> [n, n*10]
+// output: [1, 10, 2, 20, 3, 30]
+func FlatMap[T, U any](seq iter.Seq[T], fn func(T) iter.Seq[U]) iter.Seq[U] {
+    return func(yield func(U) bool) {
+        for v := range seq {
+            // fn returns a sequence — range over it
+            for inner := range fn(v) {
+                if !yield(inner) {
+                    return // caller stopped, exit everything
+                }
+            }
+        }
+    }
+}
+
+func TakeWhile[T any](seq iter.Seq[T], fn func(T) bool) iter.Seq[T] {
+    return func(yield func(T) bool) {
+        for v := range seq {
+            if !fn(v) {
+                return // condition failed — stop
+            }
+            if !yield(v) {
+                return // caller stopped — stop
+            }
+        }
+    }
+}
