@@ -34,7 +34,7 @@ func TestRetry(t *testing.T) {
 }
 
 func TestCircuitBreaker(t *testing.T) {
-	cb := resilience.NewCircuitBreaker(3, 0) // opens after 3 failures
+	cb := resilience.NewCircuitBreaker(3, 10*time.Second) // ← real timeout
 
 	// fail 3 times to open the circuit
 	for i := 0; i < 3; i++ {
