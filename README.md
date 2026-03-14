@@ -16,7 +16,7 @@ Go 1.23 or later.
 
 | Package | What it does |
 |---|---|
-| `vortex/iter` | Lazy sequences — Filter, Map, Take, FlatMap |
+| `vortex/interx` | Lazy sequences — Filter, Map, Take, FlatMap |
 | `vortex/parallel` | Parallel processing — ParallelMap, BatchMap, WorkerPoolMap |
 | `vortex/reduce` | Aggregation — AsyncReduce, Fold, Collect |
 | `vortex/resilience` | Fault tolerance — Retry, Backoff, CircuitBreaker |
@@ -73,12 +73,12 @@ it has enough results — it never touches the remaining 999,990 rows.
 ```go
 import (
     "slices"
-    "github.com/MostafaMagdSalama/vortex/iter"
+    "github.com/MostafaMagdSalama/vortex/interx"
 )
 
 numbers := slices.Values([]int{1, 2, 3, 4, 5})
 
-for v := range iter.Filter(numbers, func(n int) bool { return n > 2 }) {
+for v := range interx.Filter(context.Background(), numbers, func(n int) bool { return n > 2 }) {
     fmt.Println(v) // 3, 4, 5
 }
 ```
@@ -92,7 +92,7 @@ import (
 
 numbers := slices.Values([]int{1, 2, 3, 4, 5})
 
-for v := range parallel.ParallelMap(numbers, func(n int) int {
+for v := range parallel.ParallelMap(context.Background(), numbers, func(n int) int {
     return n * 2
 }, 4) {
     fmt.Println(v) // 2, 4, 6, 8, 10 (unordered)
@@ -101,7 +101,7 @@ for v := range parallel.ParallelMap(numbers, func(n int) int {
 
 ### Batch processing
 ```go
-for v := range parallel.BatchMap(numbers, func(batch []int) []int {
+for v := range parallel.BatchMap(context.Background(), numbers, func(batch []int) []int {
     results := make([]int, len(batch))
     for i, v := range batch {
         results[i] = v * 2
@@ -115,15 +115,16 @@ for v := range parallel.BatchMap(numbers, func(batch []int) []int {
 ### CSV pipeline
 ```go
 import (
-    "github.com/MostafaMagdSalama/vortex/iter"
+    "github.com/MostafaMagdSalama/vortex/interx"
     "github.com/MostafaMagdSalama/vortex/sources"
 )
 
 file, _ := os.Open("users.csv")
 defer file.Close()
 
-for user := range iter.Filter(
-    sources.CSVRows(file),
+for user := range interx.Filter(
+    context.Background(),
+    sources.CSVRows(context.Background(), file),
     func(row []string) bool { return row[3] == "active" },
 ) {
     fmt.Println(user)
@@ -133,15 +134,18 @@ for user := range iter.Filter(
 ### Database pipeline
 ```go
 import (
-    "github.com/MostafaMagdSalama/vortex/iter"
+    "github.com/MostafaMagdSalama/vortex/interx"
     "github.com/MostafaMagdSalama/vortex/sources"
 )
 
 // reads one row at a time — stops as soon as Take is satisfied
-names := iter.Map(
-    iter.Take(
-        iter.Filter(
-            sources.DBRows(db, "SELECT id, name, email, status FROM users", scanUser),
+names := interx.Map(
+    context.Background(),
+    interx.Take(
+        context.Background(),
+        interx.Filter(
+            context.Background(),
+            sources.DBRows(context.Background(), db, "SELECT id, name, email, status FROM users", scanUser),
             func(u User) bool { return u.Status == "active" },
         ),
         5,

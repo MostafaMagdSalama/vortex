@@ -1,6 +1,6 @@
 // Package sources provides lazy, context-aware iter.Seq values for common input sources such as readers, files, stdin, and SQL queries.
 //
-// The sources package is useful when you want to turn external data into sequences that can be consumed directly or composed with the iter and parallel packages. It lets you process CSV rows, lines, and database results incrementally instead of loading entire inputs into memory up front.
+// The sources package is useful when you want to turn external data into sequences that can be consumed directly or composed with the seq and parallel packages. It lets you process CSV rows, lines, and database results incrementally instead of loading entire inputs into memory up front.
 //
 // Example:
 //

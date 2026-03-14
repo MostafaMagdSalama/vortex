@@ -5,20 +5,20 @@
 First stable release.
 
 ### Added
-- `iter.Filter` — lazy filter with context
-- `iter.Map` — lazy map with context
-- `iter.Take` — lazy take with context
-- `iter.FlatMap` — lazy flat map with context
-- `iter.TakeWhile` — lazy take while with context
-- `iter.Zip` — zip two sequences with context
-- `iter.Validate` — validate items with error callback
-- `iter.Chunk` — split sequence into batches
-- `iter.Flatten` — flatten sequence of slices
-- `iter.Distinct` — remove duplicates
-- `iter.Contains` — check if item exists
-- `iter.ForEach` — iterate with side effects
-- `iter.Reverse` — reverse a sequence
-- `iter.Drain` — consume sequence with error handling
+- `interx.Filter` — lazy filter with context
+- `interx.Map` — lazy map with context
+- `interx.Take` — lazy take with context
+- `interx.FlatMap` — lazy flat map with context
+- `interx.TakeWhile` — lazy take while with context
+- `interx.Zip` — zip two sequences with context
+- `interx.Validate` — validate items with error callback
+- `interx.Chunk` — split sequence into batches
+- `interx.Flatten` — flatten sequence of slices
+- `interx.Distinct` — remove duplicates
+- `interx.Contains` — check if item exists
+- `interx.ForEach` — iterate with side effects
+- `interx.Reverse` — reverse a sequence
+- `interx.Drain` — consume sequence with error handling
 - `parallel.ParallelMap` — concurrent map with context
 - `parallel.BatchMap` — batch processing with context
 - `parallel.WorkerPoolMap` — worker pool map with context
