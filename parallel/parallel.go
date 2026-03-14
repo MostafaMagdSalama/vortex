@@ -6,6 +6,16 @@ import (
 	"sync"
 )
 
+type task[T any] struct {
+    index int
+    value T
+}
+
+type result[U any] struct {
+    index int
+    value U
+}
+
 // ParallelMap processes each element concurrently with n workers.
 func ParallelMap[T, U any](ctx context.Context, seq iter.Seq[T], fn func(T) U, workers int) iter.Seq[U] {
 	return func(yield func(U) bool) {
@@ -116,70 +126,114 @@ func BatchMap[T, U any](ctx context.Context, seq iter.Seq[T], fn func([]T) []U, 
 	}
 }
 
-// WorkerPoolMap uses a fixed pool of workers to process items.
-func WorkerPoolMap[T, U any](ctx context.Context, seq iter.Seq[T], fn func(T) U, workers int) iter.Seq[U] {
+// OrderedParallelMap applies fn to each element of seq concurrently using
+// workers goroutines and yields results in the original input order.
+func OrderedParallelMap[T, U any](
+	ctx context.Context,
+	seq iter.Seq[T],
+	fn func(T) U,
+	workers int,
+) iter.Seq[U] {
+
 	return func(yield func(U) bool) {
+
 		if ctx.Err() != nil {
 			return
 		}
 
-		tasks := make(chan T, workers*2)
-		results := make(chan U, workers*2)
-		var wg sync.WaitGroup
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
+		tasks := make(chan task[T], workers*2)
+		results := make(chan result[U], workers*2)
+
+		var wg sync.WaitGroup
+
+		// workers
 		for i := 0; i < workers; i++ {
 			wg.Add(1)
+
 			go func() {
 				defer wg.Done()
+
 				for {
-					if ctx.Err() != nil {
-						return
-					}
-					v, ok := <-tasks
-					if !ok {
-						return
-					}
 					select {
-					case results <- fn(v):
 					case <-ctx.Done():
 						return
+
+					case t, ok := <-tasks:
+						if !ok {
+							return
+						}
+
+						r := fn(t.value)
+
+						select {
+						case results <- result[U]{t.index, r}:
+						case <-ctx.Done():
+							return
+						}
 					}
 				}
 			}()
 		}
 
-		go func() {
-			defer close(results)
-			wg.Wait()
-		}()
-
+		// producer
 		go func() {
 			defer close(tasks)
+
+			i := 0
 			for v := range seq {
-				if ctx.Err() != nil {
-					return
-				}
+
 				select {
-				case tasks <- v:
+				case tasks <- task[T]{i, v}:
+					i++
+
 				case <-ctx.Done():
 					return
 				}
 			}
 		}()
 
+		// close results when workers done
+		go func() {
+			wg.Wait()
+			close(results)
+		}()
+
+		// ordered buffer
+		next := 0
+		buffer := map[int]U{}
+
 		for {
-			if ctx.Err() != nil {
+
+			select {
+			case <-ctx.Done():
 				return
-			}
-			result, ok := <-results
-			if !ok {
-				return
-			}
-			if !yield(result) {
-				cancel()
-				return
+
+			case r, ok := <-results:
+
+				if !ok {
+					return
+				}
+
+				buffer[r.index] = r.value
+
+				for {
+					v, exists := buffer[next]
+					if !exists {
+						break
+					}
+
+					delete(buffer, next)
+
+					if !yield(v) {
+						cancel()
+						return
+					}
+
+					next++
+				}
 			}
 		}
 	}
