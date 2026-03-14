@@ -268,9 +268,10 @@ func (cb *CircuitBreaker) Execute(ctx context.Context, fn func(ctx context.Conte
 		// recovering from half-open — full reset
 		cb.failures = 0
 		cb.state = StateClosed
+	} else if cb.state == StateClosed {
+		// reset failures on success to ensure we only trip on consecutive failures
+		cb.failures = 0
 	}
-	// if closed — do NOT reset failures
-	// failures must accumulate across successes to reflect real service health
 
 	cb.halfOpenInFlight = false
 	return nil
