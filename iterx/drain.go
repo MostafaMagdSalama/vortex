@@ -12,7 +12,7 @@ import (
 //
 // example:
 //
-//	err := interx.Drain(ctx, users, func(u User) error {
+//	err := iterx.Drain(ctx, users, func(u User) error {
 //	    return csvWriter.Write([]string{u.Name, u.Email})
 //	})
 func Drain[T any](ctx context.Context, seq iter.Seq[T], fn func(T) error) error {

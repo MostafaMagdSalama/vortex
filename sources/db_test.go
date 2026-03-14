@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/MostafaMagdSalama/vortex/interx"
+	"github.com/MostafaMagdSalama/vortex/iterx"
 	"github.com/MostafaMagdSalama/vortex/sources"
 	_ "modernc.org/sqlite"
 )
@@ -108,7 +108,7 @@ func TestDBRows_CorrectData(t *testing.T) {
 	}
 }
 
-// filter active users using interx.Filter
+// filter active users using iterx.Filter
 func TestDBRows_Filter(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()
@@ -129,7 +129,7 @@ func TestDBRows_Filter(t *testing.T) {
 	}
 
 	var active []User
-	for u := range interx.Filter(context.Background(), users, func(u User) bool {
+	for u := range iterx.Filter(context.Background(), users, func(u User) bool {
 		return u.Status == "active"
 	}) {
 		active = append(active, u)

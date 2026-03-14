@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	vinterx "github.com/MostafaMagdSalama/vortex/interx"
+	viterx "github.com/MostafaMagdSalama/vortex/iterx"
 )
 
 type User struct {
@@ -38,8 +38,8 @@ func TestValidate_AllValid(t *testing.T) {
 		{ID: "2", Name: "Bob", Email: "bob@example.com", Status: "inactive"},
 	})
 
-	var errList []vinterx.ValidationError[User]
-	valid := vinterx.Validate(context.Background(), users, validateUser, func(ve vinterx.ValidationError[User]) {
+	var errList []viterx.ValidationError[User]
+	valid := viterx.Validate(context.Background(), users, validateUser, func(ve viterx.ValidationError[User]) {
 		errList = append(errList, ve)
 	})
 
@@ -60,8 +60,8 @@ func TestValidate_AllInvalid(t *testing.T) {
 		{ID: "3", Name: "Charlie", Email: "", Status: "active"},
 	})
 
-	var errList []vinterx.ValidationError[User]
-	valid := vinterx.Validate(context.Background(), users, validateUser, func(ve vinterx.ValidationError[User]) {
+	var errList []viterx.ValidationError[User]
+	valid := viterx.Validate(context.Background(), users, validateUser, func(ve viterx.ValidationError[User]) {
 		errList = append(errList, ve)
 	})
 
@@ -85,7 +85,7 @@ func TestValidate_ErrorReasons(t *testing.T) {
 
 	expected := []string{"missing ID", "missing name", "missing email", "invalid status: unknown"}
 	var got []string
-	valid := vinterx.Validate(context.Background(), users, validateUser, func(ve vinterx.ValidationError[User]) {
+	valid := viterx.Validate(context.Background(), users, validateUser, func(ve viterx.ValidationError[User]) {
 		got = append(got, ve.Reason)
 	})
 
@@ -104,7 +104,7 @@ func TestValidate_NilCallback(t *testing.T) {
 	})
 
 	var validList []User
-	for u := range vinterx.Validate(context.Background(), users, validateUser, nil) {
+	for u := range viterx.Validate(context.Background(), users, validateUser, nil) {
 		validList = append(validList, u)
 	}
 
@@ -123,8 +123,8 @@ func TestValidate_Cancelled(t *testing.T) {
 	})
 
 	var validList []User
-	var errList []vinterx.ValidationError[User]
-	for u := range vinterx.Validate(ctx, users, validateUser, func(ve vinterx.ValidationError[User]) {
+	var errList []viterx.ValidationError[User]
+	for u := range viterx.Validate(ctx, users, validateUser, func(ve viterx.ValidationError[User]) {
 		errList = append(errList, ve)
 	}) {
 		validList = append(validList, u)
@@ -145,7 +145,7 @@ func ExampleValidate() {
 		{ID: "3", Name: "Carol", Email: "carol@example.com", Status: "active"},
 	})
 
-	for user := range vinterx.Validate(context.Background(), users, validateUser, func(ve vinterx.ValidationError[User]) {
+	for user := range viterx.Validate(context.Background(), users, validateUser, func(ve viterx.ValidationError[User]) {
 		fmt.Println("invalid:", ve.Reason)
 	}) {
 		fmt.Println("valid:", user.Name)

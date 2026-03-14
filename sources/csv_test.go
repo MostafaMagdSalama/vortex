@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/MostafaMagdSalama/vortex/interx"
+	"github.com/MostafaMagdSalama/vortex/iterx"
 )
 
 func ExampleCSVRows_filter() {
@@ -37,7 +37,7 @@ func ExampleCSVRows_pipeline() {
 	rows := CSVRows(ctx, r)
 
 	first := true
-	dataRows := interx.Filter(ctx, rows, func(row []string) bool {
+	dataRows := iterx.Filter(ctx, rows, func(row []string) bool {
 		if first {
 			first = false
 			return false
@@ -45,8 +45,8 @@ func ExampleCSVRows_pipeline() {
 		return true
 	})
 
-	names := interx.Map(ctx,
-		interx.Filter(ctx, dataRows, func(row []string) bool {
+	names := iterx.Map(ctx,
+		iterx.Filter(ctx, dataRows, func(row []string) bool {
 			return row[2] == "active"
 		}),
 		func(row []string) string {

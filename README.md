@@ -16,7 +16,7 @@ Go 1.23 or later.
 
 | Package | What it does |
 |---|---|
-| `vortex/interx` | Lazy sequences — Filter, Map, Take, FlatMap |
+| `vortex/iterx` | Lazy sequences — Filter, Map, Take, FlatMap |
 | `vortex/parallel` | Parallel processing — ParallelMap, BatchMap, WorkerPoolMap |
 | `vortex/resilience` | Fault tolerance — Retry, Backoff, CircuitBreaker |
 | `vortex/sources` | Data sources — CSVRows, DBRows, Lines, FileLines |
@@ -72,12 +72,12 @@ it has enough results — it never touches the remaining 999,990 rows.
 ```go
 import (
     "slices"
-    "github.com/MostafaMagdSalama/vortex/interx"
+    "github.com/MostafaMagdSalama/vortex/iterx"
 )
 
 numbers := slices.Values([]int{1, 2, 3, 4, 5})
 
-for v := range interx.Filter(context.Background(), numbers, func(n int) bool { return n > 2 }) {
+for v := range iterx.Filter(context.Background(), numbers, func(n int) bool { return n > 2 }) {
     fmt.Println(v) // 3, 4, 5
 }
 ```
@@ -186,9 +186,9 @@ defer file.Close()
 rows := sources.CSVRows(ctx, file)
 
 first := true
-names := interx.Map(ctx,
-    interx.Take(ctx,
-        interx.Filter(ctx, rows, func(row []string) bool {
+names := iterx.Map(ctx,
+    iterx.Take(ctx,
+        iterx.Filter(ctx, rows, func(row []string) bool {
             if first {
                 first = false
                 return false
@@ -222,16 +222,16 @@ local file        -> io.Reader -> CSVRowsWithError -> one row at a time
 ### Database pipeline
 ```go
 import (
-    "github.com/MostafaMagdSalama/vortex/interx"
+    "github.com/MostafaMagdSalama/vortex/iterx"
     "github.com/MostafaMagdSalama/vortex/sources"
 )
 
 // reads one row at a time — stops as soon as Take is satisfied
-names := interx.Map(
+names := iterx.Map(
     context.Background(),
-    interx.Take(
+    iterx.Take(
         context.Background(),
-        interx.Filter(
+        iterx.Filter(
             context.Background(),
             sources.DBRows(context.Background(), db, "SELECT id, name, email, status FROM users", scanUser),
             func(u User) bool { return u.Status == "active" },
