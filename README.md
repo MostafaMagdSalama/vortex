@@ -1,10 +1,10 @@
 # vortex
 
-o vortex is a zero-dependency Go 1.23 library that brings lazy evaluation,
+ vortex is a zero-dependency Go 1.23 library that brings lazy evaluation,
 structured concurrency, and fault tolerance to data pipeline development.
 
 Built on Go 1.23's iter.Seq and iter.Seq2 interfaces, vortex treats every
-data source — database cursors, CSV streams, JSONL files, HTTP responses —
+data source, database cursors, CSV streams, JSONL files, HTTP response
 as a unified lazy sequence. Transformations compose without intermediate
 allocations. Pipelines cancel cleanly through context propagation.
 Workers coordinate without leaking goroutines.
