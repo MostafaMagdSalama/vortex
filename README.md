@@ -25,43 +25,62 @@ Go 1.23 or later.
 
 ### CSV file — 1,000,000 rows (Windows)
 
-| Approach | Peak memory | Notes |
-|---|---|---|
-| Eager (load all) | 287 MB | loads entire file into RAM |
-| Lazy (vortex) | 3 MB | one row at a time |
+| Approach | Peak memory | Rows read | Notes |
+|---|---|---|---|
+| Eager (load all) | 287 MB | 1,000,000 | loads entire file into RAM |
+| Lazy (vortex) | 3 MB | 1,000,000 | streams one row at a time |
 
 **95x less memory** with lazy processing.
-```
+
+<details>
+<summary><b>View detailed benchmark scaling</b></summary>
+<br>
+
+```text
+╔══════════════════════════════════════════╗
+║          memory scaling data             ║
+╚══════════════════════════════════════════╝
 file size     eager peak     vortex peak
 ──────────    ──────────     ───────────
 1M rows         287 MB           3 MB
 10M rows       ~2.8 GB           3 MB
-100M rows    out of memory        3 MB
+100M rows    out of memory       3 MB
 ```
+</details>
 
 ### Database — 1,000,000 rows (Windows)
 
 | Approach | Peak memory | Rows read | Notes |
 |---|---|---|---|
 | Eager (load all) | 247 MB | 1,000,000 | loads all rows before processing |
-| Lazy (vortex) | 397 KB | 10 | stops the moment it has what it needs |
+| Lazy (vortex) | ~397 KB | 10 | stops the moment it has what it needs |
 
 **636x less memory** with lazy processing.
-```
-without vortex:
-  memory after loading all rows:  134 MB
-  memory after filtering:         204 MB
-  memory after extracting names:  247 MB
-  rows loaded: 1,000,000
 
-with vortex:
-  memory after creating source:   393 KB
-  memory after defining filter:   393 KB
-  memory after defining map:      393 KB
-  memory after defining take:     393 KB
-  peak memory: 397 KB
-  rows read: 10 out of 1,000,000
+<details>
+<summary><b>View detailed benchmark output</b></summary>
+<br>
+
+```text
+╔══════════════════════════════════════════╗
+║         with vortex (lazy)               ║
+╚══════════════════════════════════════════╝
+memory after creating source:   393 KB
+memory after defining filter:   393 KB
+memory after defining map:      393 KB
+memory after defining take:     393 KB
+peak memory: 397 KB
+rows read: 10 out of 1,000,000
+
+╔══════════════════════════════════════════╗
+║         without vortex (eager)           ║
+╚══════════════════════════════════════════╝
+memory after loading all rows:  134 MB
+memory after filtering:         204 MB
+memory after extracting names:  247 MB
+rows loaded: 1,000,000
 ```
+</details>
 
 The lazy approach stops reading from the database the moment
 it has enough results — it never touches the remaining 999,990 rows.
@@ -74,7 +93,12 @@ it has enough results — it never touches the remaining 999,990 rows.
 | Lazy (vortex) | 1 MB | ~24 ms | streams one line at a time |
 
 **194x less memory** and **~37x faster** with lazy processing.
-```
+
+<details>
+<summary><b>View detailed benchmark output</b></summary>
+<br>
+
+```text
 ╔══════════════════════════════════════════╗
 ║         with vortex (lazy)               ║
 ╚══════════════════════════════════════════╝
@@ -88,6 +112,7 @@ memory before range:            3 MB
 memory after range:             1 MB
 
 result:
+errors found:   100
 time:           24.7103ms
 peak memory:    1 MB
 
@@ -102,10 +127,12 @@ memory after filter:            194 MB
 memory after take:              194 MB
 
 result:
+errors found:   100
 total lines:    1000000
 time:           909.2772ms
 peak memory:    194 MB
 ```
+</details>
 ## Examples
 
 ### Lazy filtering
