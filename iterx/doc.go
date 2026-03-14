@@ -14,4 +14,4 @@
 //	}
 //
 // Any important notes about behaviour such as laziness, context cancellation, memory usage. Most functions are lazy and stop as soon as the context is cancelled or the consumer breaks early. Reverse buffers the full sequence in memory before yielding results, while helpers like Filter, Map, and Take stream values one at a time.
-package interx
+package iterx

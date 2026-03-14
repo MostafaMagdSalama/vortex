@@ -1,4 +1,4 @@
-package interx
+package iterx
 
 import (
 	"context"

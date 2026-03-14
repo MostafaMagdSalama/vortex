@@ -1,4 +1,4 @@
-package interx_test
+package iterx_test
 
 import (
 	"context"
