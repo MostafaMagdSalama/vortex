@@ -66,6 +66,46 @@ with vortex:
 The lazy approach stops reading from the database the moment
 it has enough results — it never touches the remaining 999,990 rows.
 
+### JSON Lines — 1,000,000 rows (Windows)
+
+| Approach | Peak memory | Time | Notes |
+|---|---|---|---|
+| Eager (load all) | 194 MB | ~909 ms | decodes the entire file into memory before processing |
+| Lazy (vortex) | 1 MB | ~24 ms | streams one line at a time |
+
+**194x less memory** and **~37x faster** with lazy processing.
+```
+╔══════════════════════════════════════════╗
+║         with vortex (lazy)               ║
+╚══════════════════════════════════════════╝
+memory before:                  3 MB
+memory after open:              3 MB
+memory after JSONLines:         3 MB
+memory after unwrap:            3 MB
+memory after Filter:            3 MB
+memory after Take:              3 MB
+memory before range:            3 MB
+memory after range:             1 MB
+
+result:
+time:           24.7103ms
+peak memory:    1 MB
+
+╔══════════════════════════════════════════╗
+║         without vortex (eager)           ║
+╚══════════════════════════════════════════╝
+memory before:                  274 KB
+memory after ReadFile:          57 MB
+memory after Split:             72 MB
+memory after decode all:        168 MB
+memory after filter:            194 MB
+memory after take:              194 MB
+
+result:
+total lines:    1000000
+time:           909.2772ms
+peak memory:    194 MB
+```
 ## Examples
 
 ### Lazy filtering
