@@ -268,3 +268,50 @@ func ExampleJSONLinesFile() {
 	// 1: Alice $9.99
 	// 2: Bob $19.99
 }
+
+func ExampleJSONLines_earlyStop() {
+	input := strings.NewReader(`{"level":"info","message":"started","service":"api"}
+{"level":"error","message":"failed","service":"api"}
+{"level":"info","message":"done","service":"api"}
+{"level":"error","message":"timeout","service":"api"}
+`)
+
+	ctx := context.Background()
+
+	// create lazy source
+	logs := sources.JSONLines[struct {
+		Level   string `json:"level"`
+		Message string `json:"message"`
+		Service string `json:"service"`
+	}](ctx, input)
+
+	// unwrap errors
+	entries := func(yield func(struct {
+		Level   string `json:"level"`
+		Message string `json:"message"`
+		Service string `json:"service"`
+	}) bool) {
+		for entry, err := range logs {
+			if err != nil {
+				return
+			}
+			if !yield(entry) {
+				return
+			}
+		}
+	}
+
+	// count errors found
+	count := 0
+	for entry := range entries {
+		if entry.Level == "error" {
+			fmt.Println(entry.Message)
+			count++
+		}
+	}
+	fmt.Printf("errors found: %d\n", count)
+	// Output:
+	// failed
+	// timeout
+	// errors found: 2
+}
