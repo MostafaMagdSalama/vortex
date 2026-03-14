@@ -1,7 +1,16 @@
 # vortex
 
-A Go library for lazy iterators, parallel processing, and resilient pipelines.
-Built on Go 1.23's `iter.Seq` — zero external dependencies.
+o vortex is a zero-dependency Go 1.23 library that brings lazy evaluation,
+structured concurrency, and fault tolerance to data pipeline development.
+
+Built on Go 1.23's iter.Seq and iter.Seq2 interfaces, vortex treats every
+data source — database cursors, CSV streams, JSONL files, HTTP responses —
+as a unified lazy sequence. Transformations compose without intermediate
+allocations. Pipelines cancel cleanly through context propagation.
+Workers coordinate without leaking goroutines.
+
+The result is pipelines that scale from a single row to a billion rows
+with flat memory, predictable latency, and production-grade error handling all without leaving idiomatic Go.
 
 ## Install
 ```bash
