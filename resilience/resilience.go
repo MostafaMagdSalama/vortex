@@ -110,32 +110,30 @@ var ErrCircuitOpen = errors.New("circuit breaker is open")
 
 // Execute runs fn if the circuit allows it.
 // In half-open state only one trial request is allowed at a time.
+// Execute runs fn if the circuit allows it.
 func (cb *CircuitBreaker) Execute(fn func() error) error {
 	cb.mu.Lock()
 
 	switch cb.state {
 	case stateOpen:
 		if time.Since(cb.lastFailure) > cb.timeout {
-			// timeout passed — allow one trial request
 			cb.state = stateHalfOpen
-			cb.halfOpenInFlight = true // claim the trial slot
+			cb.halfOpenInFlight = true
 		} else {
 			cb.mu.Unlock()
 			return ErrCircuitOpen
 		}
 
 	case stateHalfOpen:
-		// trial request already in flight — reject everyone else
 		if cb.halfOpenInFlight {
 			cb.mu.Unlock()
 			return ErrCircuitOpen
 		}
-		cb.halfOpenInFlight = true // claim the trial slot
+		cb.halfOpenInFlight = true
 	}
 
 	cb.mu.Unlock()
 
-	// call the function — outside the lock
 	err := fn()
 
 	cb.mu.Lock()
@@ -144,14 +142,25 @@ func (cb *CircuitBreaker) Execute(fn func() error) error {
 	if err != nil {
 		cb.failures++
 		cb.lastFailure = time.Now()
-		cb.state = stateOpen        // trip back to open
-		cb.halfOpenInFlight = false // release trial slot
+
+		if cb.failures >= cb.maxFailures || cb.state == stateHalfOpen {
+			cb.state = stateOpen
+		} else {
+			cb.state = stateClosed
+		}
+
+		cb.halfOpenInFlight = false
 		return err
 	}
 
-	// success — reset everything
-	cb.failures = 0
-	cb.state = stateClosed
+	// success
+	if cb.state == stateHalfOpen {
+		// recovering from half-open — reset everything
+		cb.failures = 0
+		cb.state = stateClosed
+	}
+	// if state is closed — do NOT reset failures
+	// consecutive failures must accumulate across successes
 	cb.halfOpenInFlight = false
 	return nil
 }

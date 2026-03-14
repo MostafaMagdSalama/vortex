@@ -18,7 +18,6 @@ Go 1.23 or later.
 |---|---|
 | `vortex/interx` | Lazy sequences — Filter, Map, Take, FlatMap |
 | `vortex/parallel` | Parallel processing — ParallelMap, BatchMap, WorkerPoolMap |
-| `vortex/reduce` | Aggregation — AsyncReduce, Fold, Collect |
 | `vortex/resilience` | Fault tolerance — Retry, Backoff, CircuitBreaker |
 | `vortex/sources` | Data sources — CSVRows, DBRows, Lines, FileLines |
 

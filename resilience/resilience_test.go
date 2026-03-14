@@ -88,3 +88,30 @@ func TestCircuitBreaker_HalfOpenOnlyOneRequest(t *testing.T) {
 		t.Fatalf("expected 1 trial request, got %d", trialCount.Load())
 	}
 }
+
+func TestCircuitBreaker_RespectsMaxFailures(t *testing.T) {
+	cb := resilience.NewCircuitBreaker(3, 10*time.Second)
+
+	failFn := func() error { return errors.New("fail") }
+	successFn := func() error { return nil }
+
+	// 1st failure — circuit should stay closed
+	cb.Execute(failFn)
+	if err := cb.Execute(successFn); err != nil {
+		t.Fatalf("expected closed after 1 failure, got: %v", err)
+	}
+
+	// 2nd failure — circuit should stay closed
+	cb.Execute(failFn)
+	if err := cb.Execute(successFn); err != nil {
+		t.Fatalf("expected closed after 2 failures, got: %v", err)
+	}
+
+	// 3rd failure — circuit should now open
+	cb.Execute(failFn)
+
+	// next call should be rejected — circuit is open
+	if err := cb.Execute(successFn); !errors.Is(err, resilience.ErrCircuitOpen) {
+		t.Fatalf("expected ErrCircuitOpen after 3 failures, got: %v", err)
+	}
+}
