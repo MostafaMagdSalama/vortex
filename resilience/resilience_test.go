@@ -95,23 +95,37 @@ func TestCircuitBreaker_RespectsMaxFailures(t *testing.T) {
 	failFn := func() error { return errors.New("fail") }
 	successFn := func() error { return nil }
 
-	// 1st failure — circuit should stay closed
-	cb.Execute(failFn)
-	if err := cb.Execute(successFn); err != nil {
-		t.Fatalf("expected closed after 1 failure, got: %v", err)
+	// Interleaved successes should reset the failure count.
+	for i := 0; i < 3; i++ {
+		_ = cb.Execute(failFn)
+		if err := cb.Execute(successFn); err != nil {
+			t.Fatalf("expected closed after reset on success, got: %v", err)
+		}
 	}
 
-	// 2nd failure — circuit should stay closed
-	cb.Execute(failFn)
-	if err := cb.Execute(successFn); err != nil {
-		t.Fatalf("expected closed after 2 failures, got: %v", err)
+	// Three consecutive failures should open the circuit.
+	for i := 0; i < 3; i++ {
+		_ = cb.Execute(failFn)
 	}
 
-	// 3rd failure — circuit should now open
-	cb.Execute(failFn)
-
-	// next call should be rejected — circuit is open
 	if err := cb.Execute(successFn); !errors.Is(err, resilience.ErrCircuitOpen) {
 		t.Fatalf("expected ErrCircuitOpen after 3 failures, got: %v", err)
+	}
+}
+
+func TestCircuitBreaker_SuccessResetsFailureCount(t *testing.T) {
+	cb := resilience.NewCircuitBreaker(2, 10*time.Second)
+
+	failFn := func() error { return errors.New("fail") }
+	successFn := func() error { return nil }
+
+	_ = cb.Execute(failFn)
+	if err := cb.Execute(successFn); err != nil {
+		t.Fatalf("expected success, got: %v", err)
+	}
+
+	_ = cb.Execute(failFn)
+	if err := cb.Execute(successFn); err != nil {
+		t.Fatalf("expected circuit to remain closed after non-consecutive failures, got: %v", err)
 	}
 }

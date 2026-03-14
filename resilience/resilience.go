@@ -110,7 +110,6 @@ var ErrCircuitOpen = errors.New("circuit breaker is open")
 
 // Execute runs fn if the circuit allows it.
 // In half-open state only one trial request is allowed at a time.
-// Execute runs fn if the circuit allows it.
 func (cb *CircuitBreaker) Execute(fn func() error) error {
 	cb.mu.Lock()
 
@@ -153,14 +152,9 @@ func (cb *CircuitBreaker) Execute(fn func() error) error {
 		return err
 	}
 
-	// success
-	if cb.state == stateHalfOpen {
-		// recovering from half-open — reset everything
-		cb.failures = 0
-		cb.state = stateClosed
-	}
-	// if state is closed — do NOT reset failures
-	// consecutive failures must accumulate across successes
+	// Any success resets the consecutive failure count.
+	cb.failures = 0
+	cb.state = stateClosed
 	cb.halfOpenInFlight = false
 	return nil
 }

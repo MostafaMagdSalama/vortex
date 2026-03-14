@@ -111,23 +111,112 @@ for v := range parallel.BatchMap(context.Background(), numbers, func(batch []int
 }
 ```
 
-### CSV pipeline
-```go
-import (
-    "github.com/MostafaMagdSalama/vortex/interx"
-    "github.com/MostafaMagdSalama/vortex/sources"
-)
+## CSV
 
+`sources.CSVRows` accepts any `io.Reader` and returns a lazy sequence of rows.
+The source is always streamed - never fully loaded into memory.
+
+### Local file
+
+```go
+file, err := os.Open("users.csv")
+if err != nil {
+    log.Fatal(err)
+}
+defer file.Close()
+
+for row, err := range sources.CSVRowsWithError(ctx, file) {
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(row)
+}
+```
+
+### User uploads a CSV file (HTTP multipart)
+
+```go
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+    file, _, err := r.FormFile("csv")
+    if err != nil {
+        http.Error(w, err.Error(), 400)
+        return
+    }
+    defer file.Close()
+
+    for row, err := range sources.CSVRowsWithError(r.Context(), file) {
+        if err != nil {
+            http.Error(w, err.Error(), 500)
+            return
+        }
+        fmt.Println(row)
+    }
+}
+```
+
+### Presigned URL or any HTTP URL
+
+```go
+req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://s3.amazonaws.com/bucket/file.csv", nil)
+if err != nil {
+    log.Fatal(err)
+}
+
+resp, err := http.DefaultClient.Do(req)
+if err != nil {
+    log.Fatal(err)
+}
+defer resp.Body.Close()
+
+for row, err := range sources.CSVRowsWithError(ctx, resp.Body) {
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(row)
+}
+```
+
+### Pipeline - CSV -> filter -> map -> take
+
+```go
 file, _ := os.Open("users.csv")
 defer file.Close()
 
-for user := range interx.Filter(
-    context.Background(),
-    sources.CSVRows(context.Background(), file),
-    func(row []string) bool { return row[3] == "active" },
-) {
-    fmt.Println(user)
+// skip header row, filter active users, take first 10 names
+rows := sources.CSVRows(ctx, file)
+
+first := true
+names := interx.Map(ctx,
+    interx.Take(ctx,
+        interx.Filter(ctx, rows, func(row []string) bool {
+            if first {
+                first = false
+                return false
+            }
+            return row[3] == "active" // status column
+        }),
+        10,
+    ),
+    func(row []string) string {
+        return row[1] // name column
+    },
+)
+
+for name := range names {
+    fmt.Println(name)
 }
+```
+
+### Why it is always lazy
+
+All three sources satisfy `io.Reader`. `CSVRowsWithError` reads one record at a
+time regardless of whether the source is a file, an HTTP upload, or a network
+stream.
+
+```
+multipart upload  -> io.Reader -> CSVRowsWithError -> one row at a time
+presigned URL     -> io.Reader -> CSVRowsWithError -> one row at a time
+local file        -> io.Reader -> CSVRowsWithError -> one row at a time
 ```
 
 ### Database pipeline
