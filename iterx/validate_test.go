@@ -137,21 +137,3 @@ func TestValidate_Cancelled(t *testing.T) {
 		t.Fatalf("expected 0 errors on cancelled context, got %d", len(errList))
 	}
 }
-
-func ExampleValidate() {
-	users := slices.Values([]User{
-		{ID: "1", Name: "Alice", Email: "alice@example.com", Status: "active"},
-		{ID: "", Name: "Bob", Email: "bob@example.com", Status: "inactive"},
-		{ID: "3", Name: "Carol", Email: "carol@example.com", Status: "active"},
-	})
-
-	for user := range viterx.Validate(context.Background(), users, validateUser, func(ve viterx.ValidationError[User]) {
-		fmt.Println("invalid:", ve.Reason)
-	}) {
-		fmt.Println("valid:", user.Name)
-	}
-	// Output:
-	// valid: Alice
-	// invalid: missing ID
-	// valid: Carol
-}

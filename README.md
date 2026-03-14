@@ -113,6 +113,10 @@ for v := range parallel.BatchMap(context.Background(), numbers, func(batch []int
 
 ## CSV
 
+### More iterx Examples
+
+To see real-world, runnable examples for all `iterx` functions (`Chunk`, `Contains`, `Distinct`, `Drain`, `FlatMap`, `Flatten`, `TakeWhile`, `Zip`, `Validate`, etc.), visit the `pkg.go.dev` documentation or explore `iterx/example_test.go` in the repository.
+
 `sources.CSVRows` accepts any `io.Reader` and returns a lazy sequence of rows.
 The source is always streamed - never fully loaded into memory.
 

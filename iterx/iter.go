@@ -5,14 +5,10 @@ import (
 	"iter"
 )
 
+// ValidationError represents an item that failed validation.
 type ValidationError[T any] struct {
 	Item   T
 	Reason string
-}
-
-// ValidateConfig controls what happens with invalid items.
-type ValidateConfig[T any] struct {
-	OnError func(ValidationError[T])
 }
 
 // Filter returns a new sequence containing only elements where fn returns true.
@@ -81,6 +77,8 @@ func FlatMap[T, U any](ctx context.Context, seq iter.Seq[T], fn func(T) iter.Seq
 	}
 }
 
+// TakeWhile yields values from the sequence as long as fn returns true.
+// Iteration stops as soon as fn evaluates to false for the first time.
 func TakeWhile[T any](ctx context.Context, seq iter.Seq[T], fn func(T) bool) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for v := range seq {
@@ -97,6 +95,8 @@ func TakeWhile[T any](ctx context.Context, seq iter.Seq[T], fn func(T) bool) ite
 	}
 }
 
+// Zip combines two sequences into pairs, yielding [2]any{a, b} for each
+// corresponding element. It stops as soon as the shortest sequence runs out.
 func Zip[A, B any](ctx context.Context, a iter.Seq[A], b iter.Seq[B]) iter.Seq[[2]any] {
 	return func(yield func([2]any) bool) {
 		nextA, stopA := iter.Pull(a)
@@ -127,6 +127,9 @@ func Zip[A, B any](ctx context.Context, a iter.Seq[A], b iter.Seq[B]) iter.Seq[[
 	}
 }
 
+// Validate conditionally streams elements by evaluating fn(item). If fn yields
+// {false, reason}, the onError callback is triggered with a ValidationError,
+// and the element is discarded from the resulting sequence.
 func Validate[T any](ctx context.Context, seq iter.Seq[T], fn func(T) (bool, string), onError func(ValidationError[T])) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for item := range seq {
