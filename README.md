@@ -156,6 +156,45 @@ time:           909.2772ms
 peak memory:    194 MB
 ```
 </details>
+
+## Error Handling
+
+Vortex provides a unified error handling architecture to ensure safety and transparency across pipelines. All library packages bubble up errors rather than failing silently.
+
+### Expected Errors (`vortex.Error`)
+
+All underlying errors (like network failures or database disconnects) are wrapped in `vortex.Error`. You can use `errors.As` to retrieve the original error and the operation that failed:
+
+```go
+import (
+    "errors"
+    "github.com/MostafaMagdSalama/vortex"
+)
+
+// inside your pipeline execution
+err := iterx.Drain(ctx, mySeq, processor)
+
+var vErr *vortex.Error
+if errors.As(err, &vErr) {
+    fmt.Printf("Failed operation: %s\n", vErr.Op)
+    fmt.Printf("Underlying root cause: %v\n", vErr.Err)
+}
+```
+
+### Sentinel Errors
+
+Vortex exposes common failure states as sentinel errors in the root package. You can check for them using `errors.Is`:
+
+*   `vortex.ErrCancelled`: Returned when the pipeline's context is cancelled.
+*   `vortex.ErrValidation`: Returned when validation conditions fail (e.g. `iterx.Validate`).
+*   `vortex.ErrCircuitOpen`: Returned by `resilience.CircuitBreaker` when the service is rejecting traffic.
+
+```go
+if errors.Is(err, vortex.ErrCircuitOpen) {
+    // Serve from cache instead
+}
+```
+
 ## Examples
 
 ### Lazy filtering

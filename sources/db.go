@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"iter"
+
+	"github.com/MostafaMagdSalama/vortex"
 )
 
 // querier is anything that can run a SQL query.
@@ -46,13 +48,13 @@ func DBRows[T any](ctx context.Context, db querier, query string, scan func(*sql
 
 		// check context before opening connection
 		if ctx.Err() != nil {
-			yield(zero, ctx.Err())
+			yield(zero, vortex.Wrap("sources.DBRows", ctx.Err()))
 			return
 		}
 
 		rows, err := db.QueryContext(ctx, query, args...)
 		if err != nil {
-			yield(zero, err)
+			yield(zero, vortex.Wrap("sources.DBRows", err))
 			return
 		}
 		defer rows.Close()
@@ -60,14 +62,14 @@ func DBRows[T any](ctx context.Context, db querier, query string, scan func(*sql
 		for rows.Next() {
 			// check context before processing each row
 			if ctx.Err() != nil {
-				yield(zero, ctx.Err())
+				yield(zero, vortex.Wrap("sources.DBRows", ctx.Err()))
 				return
 			}
 
 			val, err := scan(rows)
 			if err != nil {
 				// scan failed — surface the error and stop
-				yield(zero, err)
+				yield(zero, vortex.Wrap("sources.DBRows", err))
 				return
 			}
 
@@ -81,7 +83,7 @@ func DBRows[T any](ctx context.Context, db querier, query string, scan func(*sql
 		// rows.Next() returns false on both clean completion AND error
 		// without this check a dropped connection looks like clean completion
 		if err := rows.Err(); err != nil {
-			yield(zero, err)
+			yield(zero, vortex.Wrap("sources.DBRows", err))
 		}
 	}
 }

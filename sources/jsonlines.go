@@ -7,6 +7,8 @@ import (
 	"io"
 	"iter"
 	"os"
+
+	"github.com/MostafaMagdSalama/vortex"
 )
 
 // JSONLines returns a lazy sequence of decoded JSON objects from any io.Reader.
@@ -35,7 +37,7 @@ func JSONLines[T any](ctx context.Context, r io.Reader) iter.Seq2[T, error] {
 		var zero T
 
 		if ctx.Err() != nil {
-			yield(zero, ctx.Err())
+			yield(zero, vortex.Wrap("sources.JSONLines", ctx.Err()))
 			return
 		}
 
@@ -44,7 +46,7 @@ func JSONLines[T any](ctx context.Context, r io.Reader) iter.Seq2[T, error] {
 
 		for scanner.Scan() {
 			if ctx.Err() != nil {
-				yield(zero, ctx.Err())
+				yield(zero, vortex.Wrap("sources.JSONLines", ctx.Err()))
 				return
 			}
 
@@ -57,7 +59,7 @@ func JSONLines[T any](ctx context.Context, r io.Reader) iter.Seq2[T, error] {
 
 			var item T
 			if err := json.Unmarshal(line, &item); err != nil {
-				if !yield(zero, err) {
+				if !yield(zero, vortex.Wrap("sources.JSONLines", err)) {
 					return
 				}
 				continue
@@ -73,7 +75,7 @@ func JSONLines[T any](ctx context.Context, r io.Reader) iter.Seq2[T, error] {
 			if ctx.Err() != nil {
 				return
 			}
-			yield(zero, err)
+			yield(zero, vortex.Wrap("sources.JSONLines", err))
 		}
 	}
 }
@@ -92,13 +94,13 @@ func JSONLinesFile[T any](ctx context.Context, path string) iter.Seq2[T, error] 
 		var zero T
 
 		if ctx.Err() != nil {
-			yield(zero, ctx.Err())
+			yield(zero, vortex.Wrap("sources.JSONLinesFile", ctx.Err()))
 			return
 		}
 
 		file, err := os.Open(path)
 		if err != nil {
-			yield(zero, err)
+			yield(zero, vortex.Wrap("sources.JSONLinesFile", err))
 			return
 		}
 		defer file.Close()

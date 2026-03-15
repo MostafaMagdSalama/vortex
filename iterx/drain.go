@@ -3,6 +3,8 @@ package iterx
 import (
 	"context"
 	"iter"
+
+	"github.com/MostafaMagdSalama/vortex"
 )
 
 // Drain consumes a sequence and calls fn for each item.
@@ -18,10 +20,10 @@ import (
 func Drain[T any](ctx context.Context, seq iter.Seq[T], fn func(T) error) error {
 	for v := range seq {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return vortex.Wrap("iterx.Drain", ctx.Err())
 		}
 		if err := fn(v); err != nil {
-			return err
+			return vortex.Wrap("iterx.Drain", err)
 		}
 	}
 	return nil

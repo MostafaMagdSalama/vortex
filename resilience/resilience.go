@@ -8,13 +8,15 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/MostafaMagdSalama/vortex"
 )
 
 // -----------------------------
 // Errors
 // -----------------------------
 
-var ErrCircuitOpen = errors.New("circuit breaker is open")
+var ErrCircuitOpen = vortex.ErrCircuitOpen
 
 // RetryableError wraps an error and signals that the operation can be retried.
 // Use Retryable() to wrap errors that should be retried and return unwrapped
@@ -112,7 +114,7 @@ func Retry(ctx context.Context, cfg RetryConfig, fn func(attempt int) error) err
 
 	for attempt := 0; attempt < cfg.MaxAttempts; attempt++ {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return vortex.Wrap("resilience.Retry", ctx.Err())
 		}
 
 		err := fn(attempt)
@@ -136,11 +138,11 @@ func Retry(ctx context.Context, cfg RetryConfig, fn func(attempt int) error) err
 		select {
 		case <-time.After(wait):
 		case <-ctx.Done():
-			return ctx.Err()
+			return vortex.Wrap("resilience.Retry", ctx.Err())
 		}
 	}
 
-	return fmt.Errorf("retry failed after %d attempts: %w", cfg.MaxAttempts, lastErr)
+	return fmt.Errorf("vortex: retry failed after %d attempts: %w", cfg.MaxAttempts, lastErr)
 }
 
 // -----------------------------
@@ -226,7 +228,7 @@ func (cb *CircuitBreaker) Execute(ctx context.Context, fn func(ctx context.Conte
 			// still open — reject immediately
 			cb.stats.Rejected++
 			cb.mu.Unlock()
-			return ErrCircuitOpen
+			return vortex.ErrCircuitOpen
 		}
 
 	case StateHalfOpen:
@@ -234,7 +236,7 @@ func (cb *CircuitBreaker) Execute(ctx context.Context, fn func(ctx context.Conte
 		if cb.halfOpenInFlight {
 			cb.stats.Rejected++
 			cb.mu.Unlock()
-			return ErrCircuitOpen
+			return vortex.ErrCircuitOpen
 		}
 		cb.halfOpenInFlight = true
 	}

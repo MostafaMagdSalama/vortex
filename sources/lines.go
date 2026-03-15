@@ -6,9 +6,13 @@ import (
 	"io"
 	"iter"
 	"os"
+
+	"github.com/MostafaMagdSalama/vortex"
 )
 
 // Lines returns a lazy sequence of lines from any io.Reader.
+//
+// Deprecated: silently ignores read errors. Use LinesWithError instead.
 func Lines(ctx context.Context, r io.Reader) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		scanner := bufio.NewScanner(r)
@@ -54,12 +58,14 @@ func LinesWithError(ctx context.Context, r io.Reader) iter.Seq2[string, error] {
 			if ctx.Err() != nil {
 				return
 			}
-			yield("", err)
+			yield("", vortex.Wrap("sources.LinesWithError", err))
 		}
 	}
 }
 
 // FileLines opens a file and returns a lazy sequence of its lines.
+//
+// Deprecated: silently ignores read errors. Use FileLinesWithError instead.
 func FileLines(ctx context.Context, path string) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		if ctx.Err() != nil {
@@ -102,7 +108,7 @@ func FileLinesWithError(ctx context.Context, path string) iter.Seq2[string, erro
 
 		file, err := os.Open(path)
 		if err != nil {
-			yield("", err)
+			yield("", vortex.Wrap("sources.FileLinesWithError", err))
 			return
 		}
 		defer file.Close()
@@ -126,7 +132,7 @@ func FileLinesWithError(ctx context.Context, path string) iter.Seq2[string, erro
 			if ctx.Err() != nil {
 				return
 			}
-			yield("", err)
+			yield("", vortex.Wrap("sources.FileLinesWithError", err))
 		}
 	}
 }

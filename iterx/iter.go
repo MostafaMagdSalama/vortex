@@ -2,6 +2,7 @@ package iterx
 
 import (
 	"context"
+	"fmt"
 	"iter"
 )
 
@@ -9,6 +10,11 @@ import (
 type ValidationError[T any] struct {
 	Item   T
 	Reason string
+}
+
+// Error implements the error interface.
+func (e ValidationError[T]) Error() string {
+	return fmt.Sprintf("vortex: validation failed for item %v: %s", e.Item, e.Reason)
 }
 
 // Filter returns a new sequence containing only elements where fn returns true.
