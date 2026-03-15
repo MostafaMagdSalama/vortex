@@ -69,7 +69,10 @@ func TestCSVRowsWithError_Cancelled(t *testing.T) {
 
 func TestLines(t *testing.T) {
 	var lines []string
-	for line := range sources.Lines(context.Background(), strings.NewReader("line1\nline2\nline3")) {
+	for line, err := range sources.Lines(context.Background(), strings.NewReader("line1\nline2\nline3")) {
+		if err != nil {
+			t.Fatal(err)
+		}
 		lines = append(lines, line)
 	}
 
@@ -83,8 +86,10 @@ func TestLines_Cancelled(t *testing.T) {
 	cancel()
 
 	var lines []string
-	for line := range sources.Lines(ctx, strings.NewReader("line1\nline2")) {
-		lines = append(lines, line)
+	for line, err := range sources.Lines(ctx, strings.NewReader("line1\nline2")) {
+		if err == nil {
+			lines = append(lines, line)
+		}
 	}
 
 	if len(lines) != 0 {
@@ -123,7 +128,10 @@ func TestLinesWithError_Cancelled(t *testing.T) {
 
 func TestFileLines(t *testing.T) {
 	var lines []string
-	for line := range sources.FileLines(context.Background(), filepath.Join("testdata", "sample.txt")) {
+	for line, err := range sources.FileLines(context.Background(), filepath.Join("testdata", "sample.txt")) {
+		if err != nil {
+			t.Fatal(err)
+		}
 		lines = append(lines, line)
 	}
 
@@ -137,8 +145,10 @@ func TestFileLines_Cancelled(t *testing.T) {
 	cancel()
 
 	var lines []string
-	for line := range sources.FileLines(ctx, filepath.Join("testdata", "sample.txt")) {
-		lines = append(lines, line)
+	for line, err := range sources.FileLines(ctx, filepath.Join("testdata", "sample.txt")) {
+		if err == nil {
+			lines = append(lines, line)
+		}
 	}
 
 	if len(lines) != 0 {
@@ -191,7 +201,10 @@ func TestStdin(t *testing.T) {
 	defer func() { os.Stdin = oldStdin }()
 
 	var lines []string
-	for line := range sources.Stdin(context.Background()) {
+	for line, err := range sources.Stdin(context.Background()) {
+		if err != nil {
+			t.Fatal(err)
+		}
 		lines = append(lines, line)
 	}
 
@@ -205,8 +218,10 @@ func TestStdin_Cancelled(t *testing.T) {
 	cancel()
 
 	count := 0
-	for range sources.Stdin(ctx) {
-		count++
+	for _, err := range sources.Stdin(ctx) {
+		if err == nil {
+			count++
+		}
 	}
 
 	if count != 0 {
@@ -245,7 +260,11 @@ func ExampleCSVRowsWithError() {
 func ExampleLines() {
 	input := strings.NewReader("line1\nline2\nline3\n")
 
-	for line := range sources.Lines(context.Background(), input) {
+	for line, err := range sources.Lines(context.Background(), input) {
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
 		fmt.Println(line)
 	}
 	// Output:
@@ -270,7 +289,11 @@ func ExampleLinesWithError() {
 }
 
 func ExampleFileLines() {
-	for line := range sources.FileLines(context.Background(), filepath.Join("testdata", "sample.txt")) {
+	for line, err := range sources.FileLines(context.Background(), filepath.Join("testdata", "sample.txt")) {
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
 		fmt.Println(line)
 	}
 	// Output:
@@ -308,7 +331,11 @@ func ExampleStdin() {
 	os.Stdin = tmpFile
 	defer func() { os.Stdin = oldStdin }()
 
-	for line := range sources.Stdin(context.Background()) {
+	for line, err := range sources.Stdin(context.Background()) {
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
 		fmt.Println(line)
 	}
 	// Output:
