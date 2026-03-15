@@ -11,31 +11,39 @@ In Vortex, **concurrency is bounded**. The `parallel` package guarantees:
 
 ## Available Processors
 
-### `parallel.ParallelMap`
+### `parallel.ParallelMapSeq` and `parallel.ParallelMap`
 
-`ParallelMap[T, U any](ctx, seq, mapFn, workers)` applies a transformation function concurrently across `n` workers.
+`ParallelMapSeq[T, U any](ctx, seq, mapFn, workers)` applies a transformation function concurrently across `n` workers for plain `iter.Seq[T]` inputs.
+
+`ParallelMap[T, U any](ctx, seq, mapFn, workers)` does the same for `iter.Seq2[T, error]` inputs and passes upstream errors through inline.
 
 **When to use it:**
 - I/O-bound operations (calling external APIs, reading files) where order doesn't matter.
-- **Order guarantee**: `ParallelMap` yields results as soon as they finish. Results will likely be out of order from the input sequence.
+- Use `ParallelMapSeq` for `slices.Values(...)` and other non-erroring generators.
+- Use `ParallelMap` when the input comes from `vortex/sources` or any other `iter.Seq2[T, error]`.
+- **Order guarantee**: both versions yield results as soon as they finish. Results will likely be out of order from the input sequence.
 
 ```go
-results := parallel.ParallelMap(ctx, urls, func(url string) Status {
+results := parallel.ParallelMapSeq(ctx, urls, func(url string) Status {
     return fetchStatus(url)
 }, 10) // 10 concurrent requests
 ```
 
-### `parallel.OrderedParallelMap`
+### `parallel.OrderedParallelMapSeq` and `parallel.OrderedParallelMap`
 
-`OrderedParallelMap[T, U any](ctx, seq, mapFn, workers)` acts exactly like `ParallelMap`, but it guarantees that the output sequence perfectly matches the input sequence's order.
+`OrderedParallelMapSeq[T, U any](ctx, seq, mapFn, workers)` preserves input order for plain `iter.Seq[T]` inputs.
+
+`OrderedParallelMap[T, U any](ctx, seq, mapFn, workers)` preserves input order for `iter.Seq2[T, error]` inputs while also preserving inline errors in the same order.
 
 **When to use it:**
 - Slower I/O or CPU operations where output MUST remain sorted (like maintaining file line numbers).
-- **Trade-off**: `OrderedParallelMap` requires buffering internally. If task #1 is very slow, but tasks #2–#100 finish instantly, the library must buffer #2–#100 in memory until #1 completes to yield them in order.
+- **Trade-off**: both ordered versions require buffering internally. If task #1 is very slow, but tasks #2–#100 finish instantly, the library must buffer #2–#100 in memory until #1 completes to yield them in order.
 
-### `parallel.BatchMap`
+### `parallel.BatchMapSeq` and `parallel.BatchMap`
 
-`BatchMap[T, U any](ctx, seq, batchFn, batchSize)` collects incoming sequence items into slices of size `n`, then passes that whole slice to your function.
+`BatchMapSeq[T, U any](ctx, seq, batchFn, batchSize)` collects plain `iter.Seq[T]` values into slices of size `n`, then passes each batch to your function.
+
+`BatchMap[T, U any](ctx, seq, batchFn, batchSize)` does the same for `iter.Seq2[T, error]` inputs and yields upstream errors inline instead of dropping them.
 
 **When to use it:**
 - Database bulk INSERTS or API bulk updates. Whenever the downstream system handles chunks better than individual requests.
