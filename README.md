@@ -12,6 +12,20 @@ Workers coordinate without leaking goroutines.
 The result is pipelines that scale from a single row to a billion rows
 with flat memory, predictable latency, and production-grade error handling all without leaving idiomatic Go.
 
+## Architecture
+
+```text
+ ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌──────────────────┐
+ │     Source      │ ──► │ Transformation  │ ──► │ Transformation  │ ──► │     Terminal     │
+ │    (iter.Seq)   │     │  (Filter/Map)   │     │  (Take/Chunk)   │     │  (Drain/Range)   │
+ └─────────────────┘     └─────────────────┘     └─────────────────┘     └──────────────────┘
+          ▲                       ▲                       ▲                        ▲
+          │                       │                       │                        │
+  sources.CSVRows         iterx.Filter            iterx.Take               iterx.Drain
+  sources.DBRows          iterx.Map               iterx.Chunk              iterx.ForEach
+  slices.Values           parallel.BatchMap       parallel.ParallelMap     for v := range
+```
+
 ## Install
 ```bash
 go get github.com/MostafaMagdSalama/vortex@latest
@@ -171,6 +185,15 @@ for v := range parallel.ParallelMap(context.Background(), numbers, func(n int) i
     return n * 2
 }, 4) {
     fmt.Println(v) // 2, 4, 6, 8, 10 (unordered)
+}
+```
+
+### Ordered parallel processing
+```go
+for v := range parallel.OrderedParallelMap(context.Background(), numbers, func(n int) int {
+    return n * 2
+}, 4) {
+    fmt.Println(v) // 2, 4, 6, 8, 10 (strictly ordered)
 }
 ```
 
