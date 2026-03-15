@@ -13,25 +13,31 @@ import (
 // Lines returns a lazy sequence of lines from any io.Reader.
 //
 // Deprecated: silently ignores read errors. Use LinesWithError instead.
-func Lines(ctx context.Context, r io.Reader) iter.Seq[string] {
-	return func(yield func(string) bool) {
+func Lines(ctx context.Context, r io.Reader) iter.Seq2[string, error] {
+	return func(yield func(string, error) bool) {
+		if ctx.Err() != nil {
+			yield("", vortex.Wrap("sources.Lines", ctx.Err()))
+			return
+		}
+
 		scanner := bufio.NewScanner(r)
 		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 
-		for {
+		for scanner.Scan() {
 			if ctx.Err() != nil {
+				yield("", vortex.Wrap("sources.Lines", ctx.Err()))
 				return
 			}
-			if !scanner.Scan() {
-				break
-			}
-			if !yield(scanner.Text()) {
+			if !yield(scanner.Text(), nil) {
 				return
 			}
 		}
 
-		if scanner.Err() != nil {
-			return
+		if err := scanner.Err(); err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			yield("", vortex.Wrap("sources.Lines", err))
 		}
 	}
 }
@@ -66,35 +72,24 @@ func LinesWithError(ctx context.Context, r io.Reader) iter.Seq2[string, error] {
 // FileLines opens a file and returns a lazy sequence of its lines.
 //
 // Deprecated: silently ignores read errors. Use FileLinesWithError instead.
-func FileLines(ctx context.Context, path string) iter.Seq[string] {
-	return func(yield func(string) bool) {
+func FileLines(ctx context.Context, path string) iter.Seq2[string, error] {
+	return func(yield func(string, error) bool) {
 		if ctx.Err() != nil {
+			yield("", vortex.Wrap("sources.FileLines", ctx.Err()))
 			return
 		}
 
 		file, err := os.Open(path)
 		if err != nil {
+			yield("", vortex.Wrap("sources.FileLines", err))
 			return
 		}
 		defer file.Close()
 
-		scanner := bufio.NewScanner(file)
-		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
-
-		for {
-			if ctx.Err() != nil {
+		for line, err := range Lines(ctx, file) {
+			if !yield(line, err) {
 				return
 			}
-			if !scanner.Scan() {
-				break
-			}
-			if !yield(scanner.Text()) {
-				return
-			}
-		}
-
-		if scanner.Err() != nil {
-			return
 		}
 	}
 }
@@ -138,6 +133,6 @@ func FileLinesWithError(ctx context.Context, path string) iter.Seq2[string, erro
 }
 
 // Stdin returns a lazy sequence of lines from standard input.
-func Stdin(ctx context.Context) iter.Seq[string] {
+func Stdin(ctx context.Context) iter.Seq2[string, error] {
 	return Lines(ctx, os.Stdin)
 }
