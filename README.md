@@ -41,11 +41,13 @@ Go 1.24 or later.
 | Package | What it does |
 |---|---|
 | `vortex/iterx` | Lazy sequences — Filter, Map, Take, FlatMap |
-| `vortex/parallel` | Parallel processing — ParallelMap, BatchMap, WorkerPoolMap |
+| `vortex/parallel` | Parallel processing for `iter.Seq` and `iter.Seq2` |
 | `vortex/resilience` | Fault tolerance — Retry, Backoff, CircuitBreaker |
 | `vortex/sources` | Data sources — CSVRows, DBRows, Lines, FileLines |
 
 `iterx` now includes paired APIs: use `*Seq` helpers like `FilterSeq` and `MapSeq` with plain `iter.Seq[T]`, and use the original names like `Filter` and `Map` with `iter.Seq2[T, error]`.
+
+`parallel` follows the same pattern: use `ParallelMapSeq`, `BatchMapSeq`, and `OrderedParallelMapSeq` with plain `iter.Seq[T]`, and use `ParallelMap`, `BatchMap`, and `OrderedParallelMap` with `iter.Seq2[T, error]`.
 
 ## Benchmarks
 
@@ -235,7 +237,7 @@ import (
 
 numbers := slices.Values([]int{1, 2, 3, 4, 5})
 
-for v := range parallel.ParallelMap(context.Background(), numbers, func(n int) int {
+for v := range parallel.ParallelMapSeq(context.Background(), numbers, func(n int) int {
     return n * 2
 }, 4) {
     fmt.Println(v) // 2, 4, 6, 8, 10 (unordered)
@@ -244,7 +246,7 @@ for v := range parallel.ParallelMap(context.Background(), numbers, func(n int) i
 
 ### Ordered parallel processing
 ```go
-for v := range parallel.OrderedParallelMap(context.Background(), numbers, func(n int) int {
+for v := range parallel.OrderedParallelMapSeq(context.Background(), numbers, func(n int) int {
     return n * 2
 }, 4) {
     fmt.Println(v) // 2, 4, 6, 8, 10 (strictly ordered)
@@ -253,7 +255,7 @@ for v := range parallel.OrderedParallelMap(context.Background(), numbers, func(n
 
 ### Batch processing
 ```go
-for v := range parallel.BatchMap(context.Background(), numbers, func(batch []int) []int {
+for v := range parallel.BatchMapSeq(context.Background(), numbers, func(batch []int) []int {
     results := make([]int, len(batch))
     for i, v := range batch {
         results[i] = v * 2
