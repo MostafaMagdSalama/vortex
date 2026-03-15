@@ -4,6 +4,12 @@ Vortex treats all incoming data — a 100GB CSV, a 10-row database query, or lin
 
 This drastically reduces the API surface of Vortex. Every source yields identically, so they are entirely interchangeable.
 
+Every function in `vortex/sources` returns `iter.Seq2[T, error]`, so downstream pipelines should use the `iterx` helpers that also support `iter.Seq2`, such as `iterx.Filter`, `iterx.Map`, `iterx.Take`, `iterx.Validate`, and `iterx.Drain`.
+
+This is intentional: sources can fail while reading, decoding, scanning, or reacting to cancellation, and `iter.Seq2` keeps those errors in the stream instead of discarding them.
+
+Vortex also keeps `*Seq` helper variants such as `iterx.FilterSeq`, `iterx.MapSeq`, and `iterx.TakeSeq` for plain `iter.Seq[T]` values that do not yield errors.
+
 ## `io.Reader` sources
 
 Functions like `Lines` and `CSVRows` accept any `io.Reader`. This allows extreme flexibility:
@@ -15,7 +21,7 @@ formFile, _, _ := r.FormFile("csv")                 // A multipart form upload
 buf := bytes.NewBufferString("a,b\n1,2")            // A string buffer 
 ```
 
-Because `vortex/sources` wraps these into an iterator, the downstream `vortex/iterx` package (like `Map` or `Take`) has no idea where the data originated.
+Because `vortex/sources` wraps these into an iterator, the downstream `vortex/iterx` package can process them uniformly while still preserving source errors through the `iter.Seq2` pipeline.
 
 ## Memory Implications
 

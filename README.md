@@ -162,9 +162,15 @@ peak memory:    194 MB
 
 ## iterx API split
 
-Use `iterx.FilterSeq`, `iterx.MapSeq`, `iterx.TakeSeq`, `iterx.DrainSeq`, and friends with plain `iter.Seq[T]` values such as `slices.Values(...)`.
+Vortex sources return `iter.Seq2[T, error]`. That includes `sources.CSVRows`, `sources.DBRows`, `sources.Lines`, and `sources.JSONLines`.
 
-Use `iterx.Filter`, `iterx.Map`, `iterx.Take`, `iterx.Drain`, and friends with `iter.Seq2[T, error]` values such as `sources.CSVRows`, `sources.DBRows`, and `sources.JSONLines`.
+When your pipeline starts from `vortex/sources`, use the `iter.Seq2`-aware helpers like `iterx.Filter`, `iterx.Map`, `iterx.Take`, `iterx.FlatMap`, `iterx.Validate`, `iterx.Drain`, and `iterx.ForEach`.
+
+This is how Vortex preserves error handling across the pipeline: read failures, decode failures, scan failures, and cancellation errors stay attached to the stream instead of being lost at the source boundary.
+
+Vortex also keeps `iterx.FilterSeq`, `iterx.MapSeq`, `iterx.TakeSeq`, `iterx.DrainSeq`, and the other `*Seq` helpers for plain `iter.Seq[T]` values such as `slices.Values(...)` or custom generators that do not yield errors.
+
+The split exists so `iter.Seq2` pipelines stay safe and explicit, while ordinary `iter.Seq` pipelines remain simple and ergonomic.
 
 ## Error Handling
 
