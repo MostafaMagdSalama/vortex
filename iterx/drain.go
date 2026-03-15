@@ -14,10 +14,10 @@ import (
 func DrainSeq[T any](ctx context.Context, seq iter.Seq[T], fn func(T) error) error {
 	for v := range seq {
 		if ctx.Err() != nil {
-			return vortex.Wrap("iterx.Drain", ctx.Err())
+			return vortex.Wrap("iterx.DrainSeq", ctx.Err())
 		}
 		if err := fn(v); err != nil {
-			return vortex.Wrap("iterx.Drain", err)
+			return vortex.Wrap("iterx.DrainSeq", err)
 		}
 	}
 	return nil

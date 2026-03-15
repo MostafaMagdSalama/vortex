@@ -18,6 +18,8 @@ func CSVRows(ctx context.Context, r io.Reader) iter.Seq2[[]string, error] {
 		}
 
 		reader := csv.NewReader(r)
+		// FieldsPerRecord = 0 means the field count is set by the first record.
+		// Subsequent records with a different number of fields will return an error.
 		reader.FieldsPerRecord = 0
 
 		for {

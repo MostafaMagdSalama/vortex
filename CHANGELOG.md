@@ -21,11 +21,11 @@ First stable release.
 - `iterx.Drain` — consume sequence with error handling
 - `parallel.ParallelMap` — concurrent map with context
 - `parallel.BatchMap` — batch processing with context
-- `parallel.WorkerPoolMap` — worker pool map with context
+- `parallel.OrderedParallelMap` — ordered parallel map with context
 - `resilience.Retry` — retry with exponential backoff
 - `resilience.CircuitBreaker` — circuit breaker with half-open fix
 - `sources.DBRows` — lazy DB rows with context
-- `sources.DBRowsWithArgs` — lazy DB rows with args and context
+- `sources.DBRows` — lazy DB rows with variadic query args and context
 - `sources.CSVRows` — lazy CSV rows with context
 - `sources.FileLines` — lazy file lines with context
 - `sources.Lines` — lazy lines from any reader

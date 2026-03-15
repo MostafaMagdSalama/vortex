@@ -5,6 +5,9 @@
 *.so
 *.dylib
 
+# archives
+*.tar.gz
+
 # test binaries
 *.test
 *.out

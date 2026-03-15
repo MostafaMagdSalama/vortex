@@ -37,17 +37,18 @@ func ParallelMapSeq[T, U any](ctx context.Context, seq iter.Seq[T], fn func(T) U
 			go func() {
 				defer wg.Done()
 				for {
-					if ctx.Err() != nil {
-						return
-					}
-					v, ok := <-jobs
-					if !ok {
-						return
-					}
 					select {
-					case results <- fn(v):
 					case <-ctx.Done():
 						return
+					case v, ok := <-jobs:
+						if !ok {
+							return
+						}
+						select {
+						case results <- fn(v):
+						case <-ctx.Done():
+							return
+						}
 					}
 				}
 			}()
