@@ -14,7 +14,11 @@ func ExampleCSVRows_filter() {
 
 	// skip header and filter active users
 	first := true
-	for row := range CSVRows(context.Background(), r) {
+	for row, err := range CSVRows(context.Background(), r) {
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
 		if first {
 			first = false
 			continue
@@ -34,7 +38,17 @@ func ExampleCSVRows_pipeline() {
 
 	ctx := context.Background()
 
-	rows := CSVRows(ctx, r)
+	rows := func(yield func([]string) bool) {
+		for row, err := range CSVRows(ctx, r) {
+			if err != nil {
+				fmt.Println("Error:", err)
+				return
+			}
+			if !yield(row) {
+				return
+			}
+		}
+	}
 
 	first := true
 	dataRows := iterx.Filter(ctx, rows, func(row []string) bool {

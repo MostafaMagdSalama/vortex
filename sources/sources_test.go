@@ -17,7 +17,10 @@ func TestCSVRows(t *testing.T) {
 	input := "name,age,status\nAlice,30,active\nBob,25,inactive\nCharlie,35,active"
 
 	var rows [][]string
-	for row := range sources.CSVRows(context.Background(), strings.NewReader(input)) {
+	for row, err := range sources.CSVRows(context.Background(), strings.NewReader(input)) {
+		if err != nil {
+			t.Fatal(err)
+		}
 		rows = append(rows, row)
 	}
 
@@ -31,8 +34,10 @@ func TestCSVRows_Cancelled(t *testing.T) {
 	cancel()
 
 	var rows [][]string
-	for row := range sources.CSVRows(ctx, strings.NewReader("a,b\n1,2")) {
-		rows = append(rows, row)
+	for row, err := range sources.CSVRows(ctx, strings.NewReader("a,b\n1,2")) {
+		if err == nil {
+			rows = append(rows, row)
+		}
 	}
 
 	if len(rows) != 0 {
@@ -40,30 +45,16 @@ func TestCSVRows_Cancelled(t *testing.T) {
 	}
 }
 
-func TestCSVRowsWithError(t *testing.T) {
+func TestCSVRows_Error(t *testing.T) {
 	input := "\"unterminated"
 	var gotErr error
 
-	for _, err := range sources.CSVRowsWithError(context.Background(), strings.NewReader(input)) {
+	for _, err := range sources.CSVRows(context.Background(), strings.NewReader(input)) {
 		gotErr = err
 	}
 
 	if gotErr == nil {
 		t.Fatal("expected csv read error")
-	}
-}
-
-func TestCSVRowsWithError_Cancelled(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	count := 0
-	for range sources.CSVRowsWithError(ctx, strings.NewReader("a,b\n1,2")) {
-		count++
-	}
-
-	if count != 0 {
-		t.Fatalf("expected 0 results on cancelled context, got %d", count)
 	}
 }
 
@@ -97,11 +88,11 @@ func TestLines_Cancelled(t *testing.T) {
 	}
 }
 
-func TestLinesWithError(t *testing.T) {
+func TestLines_Error(t *testing.T) {
 	longLine := strings.Repeat("a", 1024*1024+1)
 	var gotErr error
 
-	for _, err := range sources.LinesWithError(context.Background(), strings.NewReader(longLine)) {
+	for _, err := range sources.Lines(context.Background(), strings.NewReader(longLine)) {
 		if err != nil {
 			gotErr = err
 		}
@@ -109,20 +100,6 @@ func TestLinesWithError(t *testing.T) {
 
 	if gotErr == nil {
 		t.Fatal("expected scanner error")
-	}
-}
-
-func TestLinesWithError_Cancelled(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	count := 0
-	for range sources.LinesWithError(ctx, strings.NewReader("line1\nline2")) {
-		count++
-	}
-
-	if count != 0 {
-		t.Fatalf("expected 0 results on cancelled context, got %d", count)
 	}
 }
 
@@ -156,29 +133,15 @@ func TestFileLines_Cancelled(t *testing.T) {
 	}
 }
 
-func TestFileLinesWithError(t *testing.T) {
+func TestFileLines_Error(t *testing.T) {
 	var gotErr error
 
-	for _, err := range sources.FileLinesWithError(context.Background(), filepath.Join("testdata", "missing.txt")) {
+	for _, err := range sources.FileLines(context.Background(), filepath.Join("testdata", "missing.txt")) {
 		gotErr = err
 	}
 
 	if gotErr == nil || !errors.Is(gotErr, os.ErrNotExist) {
 		t.Fatalf("expected file open error, got %v", gotErr)
-	}
-}
-
-func TestFileLinesWithError_Cancelled(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	count := 0
-	for range sources.FileLinesWithError(ctx, filepath.Join("testdata", "sample.txt")) {
-		count++
-	}
-
-	if count != 0 {
-		t.Fatalf("expected 0 results on cancelled context, got %d", count)
 	}
 }
 
@@ -232,19 +195,7 @@ func TestStdin_Cancelled(t *testing.T) {
 func ExampleCSVRows() {
 	input := strings.NewReader("name,age\nAlice,30\nBob,25\n")
 
-	for row := range sources.CSVRows(context.Background(), input) {
-		fmt.Println(row[0], row[1])
-	}
-	// Output:
-	// name age
-	// Alice 30
-	// Bob 25
-}
-
-func ExampleCSVRowsWithError() {
-	input := strings.NewReader("name,age\nAlice,30\nBob,25\n")
-
-	for row, err := range sources.CSVRowsWithError(context.Background(), input) {
+	for row, err := range sources.CSVRows(context.Background(), input) {
 		if err != nil {
 			fmt.Println("error:", err)
 			return
@@ -273,35 +224,8 @@ func ExampleLines() {
 	// line3
 }
 
-func ExampleLinesWithError() {
-	input := strings.NewReader("line1\nline2\n")
-
-	for line, err := range sources.LinesWithError(context.Background(), input) {
-		if err != nil {
-			fmt.Println("error:", err)
-			return
-		}
-		fmt.Println(line)
-	}
-	// Output:
-	// line1
-	// line2
-}
-
 func ExampleFileLines() {
 	for line, err := range sources.FileLines(context.Background(), filepath.Join("testdata", "sample.txt")) {
-		if err != nil {
-			fmt.Println("error:", err)
-			return
-		}
-		fmt.Println(line)
-	}
-	// Output:
-	// hello\nworld\nfoo
-}
-
-func ExampleFileLinesWithError() {
-	for line, err := range sources.FileLinesWithError(context.Background(), filepath.Join("testdata", "sample.txt")) {
 		if err != nil {
 			fmt.Println("error:", err)
 			return

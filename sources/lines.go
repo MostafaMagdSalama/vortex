@@ -11,39 +11,7 @@ import (
 )
 
 // Lines returns a lazy sequence of lines from any io.Reader.
-//
-// Deprecated: silently ignores read errors. Use LinesWithError instead.
 func Lines(ctx context.Context, r io.Reader) iter.Seq2[string, error] {
-	return func(yield func(string, error) bool) {
-		if ctx.Err() != nil {
-			yield("", vortex.Wrap("sources.Lines", ctx.Err()))
-			return
-		}
-
-		scanner := bufio.NewScanner(r)
-		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
-
-		for scanner.Scan() {
-			if ctx.Err() != nil {
-				yield("", vortex.Wrap("sources.Lines", ctx.Err()))
-				return
-			}
-			if !yield(scanner.Text(), nil) {
-				return
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			if ctx.Err() != nil {
-				return
-			}
-			yield("", vortex.Wrap("sources.Lines", err))
-		}
-	}
-}
-
-// LinesWithError is like Lines but surfaces read errors and oversized lines.
-func LinesWithError(ctx context.Context, r io.Reader) iter.Seq2[string, error] {
 	return func(yield func(string, error) bool) {
 		scanner := bufio.NewScanner(r)
 		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
@@ -64,14 +32,12 @@ func LinesWithError(ctx context.Context, r io.Reader) iter.Seq2[string, error] {
 			if ctx.Err() != nil {
 				return
 			}
-			yield("", vortex.Wrap("sources.LinesWithError", err))
+			yield("", vortex.Wrap("sources.Lines", err))
 		}
 	}
 }
 
 // FileLines opens a file and returns a lazy sequence of its lines.
-//
-// Deprecated: silently ignores read errors. Use FileLinesWithError instead.
 func FileLines(ctx context.Context, path string) iter.Seq2[string, error] {
 	return func(yield func(string, error) bool) {
 		if ctx.Err() != nil {
@@ -94,43 +60,6 @@ func FileLines(ctx context.Context, path string) iter.Seq2[string, error] {
 	}
 }
 
-// FileLinesWithError is like FileLines but surfaces errors.
-func FileLinesWithError(ctx context.Context, path string) iter.Seq2[string, error] {
-	return func(yield func(string, error) bool) {
-		if ctx.Err() != nil {
-			return
-		}
-
-		file, err := os.Open(path)
-		if err != nil {
-			yield("", vortex.Wrap("sources.FileLinesWithError", err))
-			return
-		}
-		defer file.Close()
-
-		scanner := bufio.NewScanner(file)
-		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
-
-		for {
-			if ctx.Err() != nil {
-				return
-			}
-			if !scanner.Scan() {
-				break
-			}
-			if !yield(scanner.Text(), nil) {
-				return
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			if ctx.Err() != nil {
-				return
-			}
-			yield("", vortex.Wrap("sources.FileLinesWithError", err))
-		}
-	}
-}
 
 // Stdin returns a lazy sequence of lines from standard input.
 func Stdin(ctx context.Context) iter.Seq2[string, error] {

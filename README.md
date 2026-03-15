@@ -267,7 +267,7 @@ if err != nil {
 }
 defer file.Close()
 
-for row, err := range sources.CSVRowsWithError(ctx, file) {
+for row, err := range sources.CSVRows(ctx, file) {
     if err != nil {
         log.Fatal(err)
     }
@@ -286,7 +286,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
     }
     defer file.Close()
 
-    for row, err := range sources.CSVRowsWithError(r.Context(), file) {
+    for row, err := range sources.CSVRows(r.Context(), file) {
         if err != nil {
             http.Error(w, err.Error(), 500)
             return
@@ -310,7 +310,7 @@ if err != nil {
 }
 defer resp.Body.Close()
 
-for row, err := range sources.CSVRowsWithError(ctx, resp.Body) {
+for row, err := range sources.CSVRows(ctx, resp.Body) {
     if err != nil {
         log.Fatal(err)
     }
