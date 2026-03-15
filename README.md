@@ -21,6 +21,7 @@ with flat memory, predictable latency, and production-grade error handling all w
  └─────────────────┘     └─────────────────┘     └─────────────────┘     └──────────────────┘
           ▲                       ▲                       ▲                        ▲
           │                       │                       │                        │
+  slices.Values           iterx.FilterSeq         iterx.TakeSeq            iterx.DrainSeq
   sources.CSVRows         iterx.Filter            iterx.Take               iterx.Drain
   sources.DBRows          iterx.Map               iterx.Chunk              iterx.ForEach
   slices.Values           parallel.BatchMap       parallel.ParallelMap     for v := range
@@ -33,7 +34,7 @@ go get github.com/MostafaMagdSalama/vortex@latest
 
 ## Requirements
 
-Go 1.23 or later.
+Go 1.24 or later.
 
 ## Packages
 
@@ -43,6 +44,8 @@ Go 1.23 or later.
 | `vortex/parallel` | Parallel processing — ParallelMap, BatchMap, WorkerPoolMap |
 | `vortex/resilience` | Fault tolerance — Retry, Backoff, CircuitBreaker |
 | `vortex/sources` | Data sources — CSVRows, DBRows, Lines, FileLines |
+
+`iterx` now includes paired APIs: use `*Seq` helpers like `FilterSeq` and `MapSeq` with plain `iter.Seq[T]`, and use the original names like `Filter` and `Map` with `iter.Seq2[T, error]`.
 
 ## Benchmarks
 
@@ -157,6 +160,12 @@ peak memory:    194 MB
 ```
 </details>
 
+## iterx API split
+
+Use `iterx.FilterSeq`, `iterx.MapSeq`, `iterx.TakeSeq`, `iterx.DrainSeq`, and friends with plain `iter.Seq[T]` values such as `slices.Values(...)`.
+
+Use `iterx.Filter`, `iterx.Map`, `iterx.Take`, `iterx.Drain`, and friends with `iter.Seq2[T, error]` values such as `sources.CSVRows`, `sources.DBRows`, and `sources.JSONLines`.
+
 ## Error Handling
 
 Vortex provides a unified error handling architecture to ensure safety and transparency across pipelines. All library packages bubble up errors rather than failing silently.
@@ -206,7 +215,7 @@ import (
 
 numbers := slices.Values([]int{1, 2, 3, 4, 5})
 
-for v := range iterx.Filter(context.Background(), numbers, func(n int) bool { return n > 2 }) {
+for v := range iterx.FilterSeq(context.Background(), numbers, func(n int) bool { return n > 2 }) {
     fmt.Println(v) // 3, 4, 5
 }
 ```
@@ -253,7 +262,7 @@ for v := range parallel.BatchMap(context.Background(), numbers, func(batch []int
 
 ### More iterx Examples
 
-To see real-world, runnable examples for all `iterx` functions (`Chunk`, `Contains`, `Distinct`, `Drain`, `FlatMap`, `Flatten`, `TakeWhile`, `Zip`, `Validate`, etc.), visit the `pkg.go.dev` documentation or explore `iterx/example_test.go` in the repository.
+To see real-world, runnable examples for both the `*Seq` helpers and the error-aware `iter.Seq2` helpers, visit the `pkg.go.dev` documentation or explore `iterx/example_test.go` in the repository.
 
 `sources.CSVRows` accepts any `io.Reader` and returns a lazy sequence of rows.
 The source is always streamed - never fully loaded into memory.
@@ -351,14 +360,14 @@ for name := range names {
 
 ### Why it is always lazy
 
-All three sources satisfy `io.Reader`. `CSVRowsWithError` reads one record at a
+All three sources satisfy `io.Reader`. `CSVRows` reads one record at a
 time regardless of whether the source is a file, an HTTP upload, or a network
 stream.
 
 ```
-multipart upload  -> io.Reader -> CSVRowsWithError -> one row at a time
-presigned URL     -> io.Reader -> CSVRowsWithError -> one row at a time
-local file        -> io.Reader -> CSVRowsWithError -> one row at a time
+multipart upload  -> io.Reader -> CSVRows -> one row at a time
+presigned URL     -> io.Reader -> CSVRows -> one row at a time
+local file        -> io.Reader -> CSVRows -> one row at a time
 ```
 
 ### Database pipeline

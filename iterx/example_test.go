@@ -16,7 +16,7 @@ func ExampleChunk() {
 	ctx := context.Background()
 	logs := slices.Values([]string{"log1", "log2", "log3", "log4", "log5"})
 
-	for batch := range iterx.Chunk(ctx, logs, 2) {
+	for batch := range iterx.ChunkSeq(ctx, logs, 2) {
 		fmt.Printf("Batch size: %d, items: %v\n", len(batch), batch)
 	}
 	// Output:
@@ -31,7 +31,7 @@ func ExampleContains() {
 	ctx := context.Background()
 	users := slices.Values([]string{"alice", "bob", "charlie", "admin"})
 
-	hasAdmin := iterx.Contains(ctx, users, "admin")
+	hasAdmin := iterx.ContainsSeq(ctx, users, "admin")
 	fmt.Println("Has admin:", hasAdmin)
 	// Output: Has admin: true
 }
@@ -42,7 +42,7 @@ func ExampleDistinct() {
 	ctx := context.Background()
 	ipAddresses := slices.Values([]string{"192.168.1.1", "10.0.0.1", "192.168.1.1", "10.0.0.2"})
 
-	for ip := range iterx.Distinct(ctx, ipAddresses) {
+	for ip := range iterx.DistinctSeq(ctx, ipAddresses) {
 		fmt.Println(ip)
 	}
 	// Output:
@@ -60,7 +60,7 @@ func ExampleDrain() {
 	// Simulate writing to something that could fail
 	var out strings.Builder
 
-	err := iterx.Drain(ctx, lines, func(line string) error {
+	err := iterx.DrainSeq(ctx, lines, func(line string) error {
 		_, err := out.WriteString(line + "\n")
 		return err // stops early if err != nil
 	})
@@ -78,7 +78,7 @@ func ExampleFilter() {
 	ctx := context.Background()
 	numbers := slices.Values([]int{1, 2, 3, 4, 5, 6})
 
-	evens := iterx.Filter(ctx, numbers, func(n int) bool {
+	evens := iterx.FilterSeq(ctx, numbers, func(n int) bool {
 		return n%2 == 0
 	})
 
@@ -105,7 +105,7 @@ func ExampleFlatMap() {
 		{Name: "Bob", Roles: []string{"viewer"}},
 	})
 
-	roles := iterx.FlatMap(ctx, users, func(u DemoUser) iter.Seq[string] {
+	roles := iterx.FlatMapSeq(ctx, users, func(u DemoUser) iter.Seq[string] {
 		return slices.Values(u.Roles)
 	})
 
@@ -127,7 +127,7 @@ func ExampleFlatten() {
 		{4, 5, 6},
 	})
 
-	for v := range iterx.Flatten(ctx, batches) {
+	for v := range iterx.FlattenSeq(ctx, batches) {
 		fmt.Println(v)
 	}
 	// Output:
@@ -144,7 +144,7 @@ func ExampleForEach() {
 	ctx := context.Background()
 	messages := slices.Values([]string{"hello", "world"})
 
-	iterx.ForEach(ctx, messages, func(msg string) {
+	iterx.ForEachSeq(ctx, messages, func(msg string) {
 		fmt.Println("Processed:", msg)
 	})
 	// Output:
@@ -160,7 +160,7 @@ func ExampleMap() {
 		{Name: "Bob"},
 	})
 
-	names := iterx.Map(ctx, users, func(u DemoUser) string {
+	names := iterx.MapSeq(ctx, users, func(u DemoUser) string {
 		return strings.ToUpper(u.Name) // U is string
 	})
 
@@ -177,7 +177,7 @@ func ExampleReverse() {
 	ctx := context.Background()
 	steps := slices.Values([]string{"step 1", "step 2", "step 3"})
 
-	for step := range iterx.Reverse(ctx, steps) {
+	for step := range iterx.ReverseSeq(ctx, steps) {
 		fmt.Println(step)
 	}
 	// Output:
@@ -192,7 +192,7 @@ func ExampleTake() {
 	ctx := context.Background()
 	items := slices.Values([]int{10, 20, 30, 40, 50, 60})
 
-	top3 := iterx.Take(ctx, items, 3)
+	top3 := iterx.TakeSeq(ctx, items, 3)
 
 	for v := range top3 {
 		fmt.Println(v)
@@ -209,7 +209,7 @@ func ExampleTakeWhile() {
 	ctx := context.Background()
 	logs := slices.Values([]string{"ok", "ok", "ok", "error", "ok"})
 
-	for v := range iterx.TakeWhile(ctx, logs, func(s string) bool {
+	for v := range iterx.TakeWhileSeq(ctx, logs, func(s string) bool {
 		return s != "error"
 	}) {
 		fmt.Println(v)
@@ -226,7 +226,7 @@ func ExampleValidate() {
 	ctx := context.Background()
 	emails := slices.Values([]string{"test@example.com", "invalid-email", "hello@world.com"})
 
-	valid := iterx.Validate(ctx, emails,
+	valid := iterx.ValidateSeq(ctx, emails,
 		func(email string) (bool, string) {
 			if !strings.Contains(email, "@") {
 				return false, "missing @"
@@ -253,7 +253,7 @@ func ExampleZip() {
 	keys := slices.Values([]string{"A", "B", "C"})
 	values := slices.Values([]int{100, 200}) // Notice: shorter sequence!
 
-	for pair := range iterx.Zip(ctx, keys, values) {
+	for pair := range iterx.ZipSeq(ctx, keys, values) {
 		fmt.Printf("%v: %v\n", pair[0], pair[1])
 	}
 	// Output:

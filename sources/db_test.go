@@ -129,7 +129,7 @@ func TestDBRows_Filter(t *testing.T) {
 	}
 
 	var active []User
-	for u := range iterx.Filter(context.Background(), users, func(u User) bool {
+	for u := range iterx.FilterSeq(context.Background(), users, func(u User) bool {
 		return u.Status == "active"
 	}) {
 		active = append(active, u)

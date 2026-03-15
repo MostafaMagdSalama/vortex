@@ -39,7 +39,7 @@ func TestValidate_AllValid(t *testing.T) {
 	})
 
 	var errList []viterx.ValidationError[User]
-	valid := viterx.Validate(context.Background(), users, validateUser, func(ve viterx.ValidationError[User]) {
+	valid := viterx.ValidateSeq(context.Background(), users, validateUser, func(ve viterx.ValidationError[User]) {
 		errList = append(errList, ve)
 	})
 
@@ -61,7 +61,7 @@ func TestValidate_AllInvalid(t *testing.T) {
 	})
 
 	var errList []viterx.ValidationError[User]
-	valid := viterx.Validate(context.Background(), users, validateUser, func(ve viterx.ValidationError[User]) {
+	valid := viterx.ValidateSeq(context.Background(), users, validateUser, func(ve viterx.ValidationError[User]) {
 		errList = append(errList, ve)
 	})
 
@@ -85,7 +85,7 @@ func TestValidate_ErrorReasons(t *testing.T) {
 
 	expected := []string{"missing ID", "missing name", "missing email", "invalid status: unknown"}
 	var got []string
-	valid := viterx.Validate(context.Background(), users, validateUser, func(ve viterx.ValidationError[User]) {
+	valid := viterx.ValidateSeq(context.Background(), users, validateUser, func(ve viterx.ValidationError[User]) {
 		got = append(got, ve.Reason)
 	})
 
@@ -104,7 +104,7 @@ func TestValidate_NilCallback(t *testing.T) {
 	})
 
 	var validList []User
-	for u := range viterx.Validate(context.Background(), users, validateUser, nil) {
+	for u := range viterx.ValidateSeq(context.Background(), users, validateUser, nil) {
 		validList = append(validList, u)
 	}
 
@@ -124,7 +124,7 @@ func TestValidate_Cancelled(t *testing.T) {
 
 	var validList []User
 	var errList []viterx.ValidationError[User]
-	for u := range viterx.Validate(ctx, users, validateUser, func(ve viterx.ValidationError[User]) {
+	for u := range viterx.ValidateSeq(ctx, users, validateUser, func(ve viterx.ValidationError[User]) {
 		errList = append(errList, ve)
 	}) {
 		validList = append(validList, u)

@@ -51,7 +51,7 @@ func ExampleCSVRows_pipeline() {
 	}
 
 	first := true
-	dataRows := iterx.Filter(ctx, rows, func(row []string) bool {
+	dataRows := iterx.FilterSeq(ctx, rows, func(row []string) bool {
 		if first {
 			first = false
 			return false
@@ -59,8 +59,8 @@ func ExampleCSVRows_pipeline() {
 		return true
 	})
 
-	names := iterx.Map(ctx,
-		iterx.Filter(ctx, dataRows, func(row []string) bool {
+	names := iterx.MapSeq(ctx,
+		iterx.FilterSeq(ctx, dataRows, func(row []string) bool {
 			return row[2] == "active"
 		}),
 		func(row []string) string {
