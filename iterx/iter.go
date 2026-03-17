@@ -103,13 +103,15 @@ func TakeSeq[T any](ctx context.Context, seq iter.Seq[T], n int) iter.Seq[T] {
 			if ctx.Err() != nil {
 				return
 			}
-			if i >= n {
-				return
-			}
+
 			if !yield(v) {
 				return
 			}
 			i++
+			if i >= n {
+				return
+			}
+
 		}
 	}
 }
@@ -132,13 +134,16 @@ func Take[T any](ctx context.Context, seq iter.Seq2[T, error], n int) iter.Seq2[
 				}
 				continue
 			}
-			if i >= n {
-				return
-			}
+
 			if !yield(v, nil) {
 				return
 			}
+
 			i++
+			if i >= n {
+				return
+			}
+
 		}
 	}
 }

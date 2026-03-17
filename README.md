@@ -34,7 +34,7 @@ go get github.com/MostafaMagdSalama/vortex@latest
 
 ## Requirements
 
-Go 1.24 or later.
+Go 1.23 or later.
 
 ## Packages
 
@@ -342,26 +342,13 @@ file, _ := os.Open("users.csv")
 defer file.Close()
 
 // skip header row, filter active users, take first 10 names
-rows := sources.CSVRows(ctx, file)
+rows     := sources.CSVRows(ctx, file)
+filtered := iterx.Filter(ctx, rows, func(row []string) bool { ... })
+taken    := iterx.Take(ctx, filtered, 10)
+names    := iterx.Map(ctx, taken, func(row []string) string { return row[1] })
 
-first := true
-names := iterx.Map(ctx,
-    iterx.Take(ctx,
-        iterx.Filter(ctx, rows, func(row []string) bool {
-            if first {
-                first = false
-                return false
-            }
-            return row[3] == "active" // status column
-        }),
-        10,
-    ),
-    func(row []string) string {
-        return row[1] // name column
-    },
-)
-
-for name := range names {
+for name, err := range names {
+    if err != nil { log.Fatal(err) }
     fmt.Println(name)
 }
 ```
@@ -386,21 +373,14 @@ import (
 )
 
 // reads one row at a time — stops as soon as Take is satisfied
-names := iterx.Map(
-    context.Background(),
-    iterx.Take(
-        context.Background(),
-        iterx.Filter(
-            context.Background(),
-            sources.DBRows(context.Background(), db, "SELECT id, name, email, status FROM users", scanUser),
-            func(u User) bool { return u.Status == "active" },
-        ),
-        5,
-    ),
-    func(u User) string { return u.Name },
-)
 
-for name := range names {
+rows     := sources.DBRows(ctx, db, "SELECT id, name, email, status FROM users", scanUser)
+filtered := iterx.Filter(ctx, rows, func(u User) bool { return u.Status == "active" })
+taken    := iterx.Take(ctx, filtered, 5)
+names    := iterx.Map(ctx, taken, func(u User) string { return u.Name })
+
+for name, err := range names {
+    if err != nil { log.Fatal(err) }
     fmt.Println(name)
 }
 ```
@@ -412,7 +392,7 @@ import (
     "github.com/MostafaMagdSalama/vortex/resilience"
 )
 
-err := resilience.Retry(context.Background(), resilience.DefaultRetry, func() error {
+err := resilience.Retry(context.Background(), resilience.DefaultRetry, func(attempt int) error {
     return callSomeAPI()
 })
 ```
@@ -421,8 +401,8 @@ err := resilience.Retry(context.Background(), resilience.DefaultRetry, func() er
 ```go
 cb := resilience.NewCircuitBreaker(5, 10*time.Second)
 
-err := cb.Execute(func() error {
-    return callSomeAPI()
+err := cb.Execute(ctx, func(ctx context.Context) error {
+    return callSomeAPI(ctx)
 })
 
 if errors.Is(err, resilience.ErrCircuitOpen) {
@@ -434,9 +414,9 @@ if errors.Is(err, resilience.ErrCircuitOpen) {
 ```go
 cb := resilience.NewCircuitBreaker(5, 10*time.Second)
 
-err := resilience.Retry(ctx, resilience.DefaultRetry, func() error {
-    return cb.Execute(func() error {
-        return callSomeAPI()
+err := resilience.Retry(ctx, resilience.DefaultRetry, func(attempt int) error {
+    return cb.Execute(ctx, func(ctx context.Context) error {
+        return callSomeAPI(ctx)
     })
 })
 ```

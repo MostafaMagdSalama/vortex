@@ -360,3 +360,84 @@ func TestDrain_Cancelled(t *testing.T) {
 		t.Fatalf("expected 0 calls, got %d", count)
 	}
 }
+
+func TestTake_ErrorAfterN(t *testing.T) {
+    seq := func(yield func(int, error) bool) {
+        if !yield(1, nil) {
+            return
+        }
+        if !yield(2, nil) {
+            return
+        }
+        if !yield(0, errors.New("upstream error")) {
+            return
+        }
+    }
+
+    var values []int
+    var errs []error
+    for v, err := range viterx.Take(context.Background(), seq, 2) {
+        if err != nil {
+            errs = append(errs, err)
+            continue
+        }
+        values = append(values, v)
+    }
+
+    if !slices.Equal(values, []int{1, 2}) {
+        t.Fatalf("expected [1 2], got %v", values)
+    }
+    if len(errs) != 0 {
+        t.Fatalf("expected no errors, got %v", errs)
+    }
+}
+func TestFilter_Seq2_ErrorPassThrough(t *testing.T) {
+    seq := func(yield func(int, error) bool) {
+        yield(1, nil)
+        yield(0, errors.New("upstream error"))
+        yield(3, nil)
+    }
+
+    var values []int
+    var errs []error
+    for v, err := range viterx.Filter(context.Background(), seq, func(n int) bool { return n > 0 }) {
+        if err != nil {
+            errs = append(errs, err)
+            continue
+        }
+        values = append(values, v)
+    }
+
+    if !slices.Equal(values, []int{1, 3}) {
+        t.Fatalf("expected [1 3], got %v", values)
+    }
+    if len(errs) != 1 {
+        t.Fatalf("expected 1 error, got %d", len(errs))
+    }
+}
+func TestDrain_Seq2_StopsOnUpstreamError(t *testing.T) {
+    seq := func(yield func(int, error) bool) {
+        if !yield(1, nil) {
+            return
+        }
+        if !yield(0, errors.New("upstream error")) {
+            return
+        }
+        if !yield(3, nil) {
+            return
+        }
+    }
+
+    count := 0
+    err := viterx.Drain(context.Background(), seq, func(n int) error {
+        count++
+        return nil
+    })
+
+    if err == nil {
+        t.Fatal("expected error, got nil")
+    }
+    if count != 1 {
+        t.Fatalf("expected 1 call before error, got %d", count)
+    }
+}
