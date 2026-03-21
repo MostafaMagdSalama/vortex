@@ -1,5 +1,7 @@
 github.com/MostafaMagdSalama/vortex v0.1.10 h1:wO7HqPUmgLQIrQDUeRtD65GZ7XETK7CPTPZEoFebnD0=
 github.com/MostafaMagdSalama/vortex v0.1.10/go.mod h1:zSYmWelGR8fYHp5PP0TXl9MJVjG+z0N7lxkSco185pc=
+github.com/MostafaMagdSalama/vortex v1.0.0 h1:vCO5mpnE76jdGXmJfWmzgWM1AGqjDjgq2AJmZjwDoJI=
+github.com/MostafaMagdSalama/vortex v1.0.0/go.mod h1:oblHlbhVErdD4sSavI+Y2Xdt9qmZVx3v6SPacTTCS/Q=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/google/pprof v0.0.0-20250317173921-a4b03ec1a45e h1:ijClszYn+mADRFY17kjQEVQ1XRhq2/JR1M3sGqeJoxs=

@@ -3,7 +3,7 @@ module example/etl_pipeline
 go 1.25.0
 
 require (
-	github.com/MostafaMagdSalama/vortex v0.1.10
+	github.com/MostafaMagdSalama/vortex v1.0.0
 	modernc.org/sqlite v1.46.2
 )
 

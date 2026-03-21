@@ -37,3 +37,6 @@ go.sum.bak
 # coverage
 coverage.out
 cove
+
+#any generated files for testing 
+*.xlsx

@@ -162,6 +162,46 @@ peak memory:    194 MB
 ```
 </details>
 
+### Database → Excel export — 1,000,000 rows (Linux)
+
+| Approach | Peak memory | Time | Notes |
+|---|---|---|---|
+| Eager (load all) | 440 MB | ~12.6s | loads all rows into RAM, then filters, then writes |
+| Lazy (vortex) | 77 MB | ~3.7s | streams one row at a time directly into the Excel file |
+
+**5.7x less memory** and **3.4x faster** with lazy processing.
+
+<details>
+<summary><b>View detailed benchmark output</b></summary>
+<br>
+
+```text
+╔══════════════════════════════════════════╗
+║         with vortex (lazy)               ║
+╚══════════════════════════════════════════╝
+rows written : 996667
+time         : 3.7112285s
+mem before   : 0.73 MB
+mem after    : 77.65 MB
+mem delta    : +76.92 MB
+
+╔══════════════════════════════════════════╗
+║         without vortex (eager)           ║
+╚══════════════════════════════════════════╝
+mem after loading all rows : 213.58 MB
+mem after filtering        : 315.11 MB
+rows written : 996667
+time         : 12.595819s
+mem before   : 53.61 MB
+mem after    : 493.71 MB
+mem delta    : +440.10 MB
+```
+</details>
+
+The eager approach holds three copies of the data in RAM simultaneously —
+the original slice, the filtered slice, and the Excel in-memory XML tree.
+The lazy approach holds one row at a time regardless of table size.
+
 ## iterx API split
 
 Vortex sources return `iter.Seq2[T, error]`. That includes `sources.CSVRows`, `sources.DBRows`, `sources.Lines`, and `sources.JSONLines`.
