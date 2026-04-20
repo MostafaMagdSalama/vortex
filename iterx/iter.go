@@ -122,6 +122,9 @@ func Take[T any](ctx context.Context, seq iter.Seq2[T, error], n int) iter.Seq2[
 	return func(yield func(T, error) bool) {
 		i := 0
 		for v, err := range seq {
+			if i >= n {
+				return
+			}
 			if ctx.Err() != nil {
 				var zero T
 				yield(zero, vortex.Wrap("iterx.Take", ctx.Err()))
@@ -140,9 +143,6 @@ func Take[T any](ctx context.Context, seq iter.Seq2[T, error], n int) iter.Seq2[
 			}
 
 			i++
-			if i >= n {
-				return
-			}
 
 		}
 	}
