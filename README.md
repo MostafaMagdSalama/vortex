@@ -1,7 +1,7 @@
 # vortex
 
- vortex is a zero-dependency Go 1.23 library that brings lazy evaluation,
-structured concurrency, and fault tolerance to data pipeline development.
+ vortex is a zero-dependency Go 1.23 library that brings lazy evaluation
+and structured concurrency to data pipeline development.
 
 Built on Go 1.23's iter.Seq and iter.Seq2 interfaces, vortex treats every
 data source, database cursors, CSV streams, JSONL files, HTTP response
@@ -42,7 +42,6 @@ Go 1.23 or later.
 |---|---|
 | `vortex/iterx` | Lazy sequences — Filter, Map, Take, FlatMap |
 | `vortex/parallel` | Parallel processing for `iter.Seq` and `iter.Seq2` |
-| `vortex/resilience` | Fault tolerance — Retry, Backoff, CircuitBreaker |
 | `vortex/sources` | Data sources — CSVRows, DBRows, Lines, FileLines |
 
 `iterx` now includes paired APIs: use `*Seq` helpers like `FilterSeq` and `MapSeq` with plain `iter.Seq[T]`, and use the original names like `Filter` and `Map` with `iter.Seq2[T, error]`.
@@ -244,13 +243,6 @@ Vortex exposes common failure states as sentinel errors in the root package. You
 
 *   `vortex.ErrCancelled`: Returned when the pipeline's context is cancelled.
 *   `vortex.ErrValidation`: Returned when validation conditions fail (e.g. `iterx.Validate`).
-*   `vortex.ErrCircuitOpen`: Returned by `resilience.CircuitBreaker` when the service is rejecting traffic.
-
-```go
-if errors.Is(err, vortex.ErrCircuitOpen) {
-    // Serve from cache instead
-}
-```
 
 ## Examples
 
@@ -425,41 +417,7 @@ for name, err := range names {
 }
 ```
 
-### Retry with backoff
-```go
-import (
-    "context"
-    "github.com/MostafaMagdSalama/vortex/resilience"
-)
 
-err := resilience.Retry(context.Background(), resilience.DefaultRetry, func(attempt int) error {
-    return callSomeAPI()
-})
-```
-
-### Circuit breaker
-```go
-cb := resilience.NewCircuitBreaker(5, 10*time.Second)
-
-err := cb.Execute(ctx, func(ctx context.Context) error {
-    return callSomeAPI(ctx)
-})
-
-if errors.Is(err, resilience.ErrCircuitOpen) {
-    // service is down, circuit is open
-}
-```
-
-### Composing retry + circuit breaker
-```go
-cb := resilience.NewCircuitBreaker(5, 10*time.Second)
-
-err := resilience.Retry(ctx, resilience.DefaultRetry, func(attempt int) error {
-    return cb.Execute(ctx, func(ctx context.Context) error {
-        return callSomeAPI(ctx)
-    })
-})
-```
 
 ## License
 

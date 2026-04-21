@@ -48,21 +48,6 @@ First stable release of vortex — a zero-dependency Go 1.23 library for lazy, m
 | `BatchMapSeq` | Sequential batch processing for plain `iter.Seq[T]` — no goroutines |
 | `OrderedParallelMapSeq` | Concurrent ordered map for plain `iter.Seq[T]` — preserves input order |
 
-### resilience
-
-| Function / Type | Description |
-|---|---|
-| `Retry` | Retries fn up to MaxAttempts — only retries errors wrapped with `Retryable()` |
-| `Backoff` | Configurable exponential backoff — 50-100% jitter range prevents thundering herd |
-| `DefaultRetry` | 3 attempts, 100ms base, 30s max, jitter enabled |
-| `DefaultBackoff` | 100ms base, 30s max, 2x multiplier, jitter enabled |
-| `RetryableError` | Wraps an error to signal it should be retried |
-| `Retryable` | Helper to wrap errors as retryable |
-| `IsRetryable` | Reports whether an error is retryable |
-| `CircuitBreaker` | Opens after n failures, half-open after timeout — one trial request at a time |
-| `NewCircuitBreaker` | Creates a new circuit breaker with maxFailures and timeout |
-| `Stats` | Runtime snapshot — requests, failures, successes, rejected, state |
-
 ### sources
 
 | Function | Description |
@@ -83,7 +68,6 @@ First stable release of vortex — a zero-dependency Go 1.23 library for lazy, m
 | `vortex.Wrap` | Helper to construct `vortex.Error` — returns nil if err is nil |
 | `vortex.ErrCancelled` | Returned when pipeline context is cancelled |
 | `vortex.ErrValidation` | Returned when validation fails |
-| `vortex.ErrCircuitOpen` | Returned when circuit breaker is open |
 
 ---
 

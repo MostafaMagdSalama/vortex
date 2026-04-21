@@ -1,5 +1,5 @@
-// Package vortex provides lazy evaluation, structured concurrency, and fault tolerance
-// pipelines for data processing.
+// Package vortex provides lazy evaluation and structured concurrency
+// for data pipeline development.
 //
 // # Error Handling
 //
@@ -14,8 +14,8 @@
 //	    fmt.Printf("Operation: %s, Cause: %v\n", vErr.Op, vErr.Err)
 //	}
 //
-// Vortex also provides Sentinel Errors for predictable failure states, like [ErrCancelled]
-// and [ErrCircuitOpen], which can be checked using [errors.Is].
+// Vortex also provides Sentinel Errors for predictable failure states, like [ErrCancelled],
+// which can be checked using [errors.Is].
 package vortex
 
 import (
@@ -25,9 +25,8 @@ import (
 
 // Sentinel errors tailored for standard Vortex operations.
 var (
-	ErrCancelled   = errors.New("vortex: operation cancelled")
-	ErrValidation  = errors.New("vortex: validation failed")
-	ErrCircuitOpen = errors.New("vortex: circuit breaker is open")
+	ErrCancelled  = errors.New("vortex: operation cancelled")
+	ErrValidation = errors.New("vortex: validation failed")
 )
 
 // Error represents a Vortex library error.
