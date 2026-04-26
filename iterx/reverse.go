@@ -42,7 +42,7 @@ func Reverse[T any](ctx context.Context, seq iter.Seq2[T, error]) iter.Seq2[T, e
 		for v, err := range seq {
 			if ctx.Err() != nil {
 				var zero T
-				yield(zero, vortex.Wrap("iterx.Reverse", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("iterx.Reverse"))
 				return
 			}
 			items = append(items, itemErr{v, err})
@@ -51,7 +51,7 @@ func Reverse[T any](ctx context.Context, seq iter.Seq2[T, error]) iter.Seq2[T, e
 		for i := len(items) - 1; i >= 0; i-- {
 			if ctx.Err() != nil {
 				var zero T
-				yield(zero, vortex.Wrap("iterx.Reverse", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("iterx.Reverse"))
 				return
 			}
 			if items[i].err != nil {

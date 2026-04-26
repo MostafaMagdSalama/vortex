@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MostafaMagdSalama/vortex"
 	"github.com/MostafaMagdSalama/vortex/sources"
 )
 
@@ -178,8 +179,8 @@ func TestJSONLines_Cancelled(t *testing.T) {
 		}
 	}
 
-	if !errors.Is(gotErr, context.Canceled) {
-		t.Fatalf("expected context.Canceled, got %v", gotErr)
+	if !errors.Is(gotErr, vortex.ErrCancelled) {
+		t.Fatalf("expected vortex.ErrCancelled, got %v", gotErr)
 	}
 }
 

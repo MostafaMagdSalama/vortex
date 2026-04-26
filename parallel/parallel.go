@@ -110,17 +110,18 @@ func ParallelMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func
 			go func() {
 				defer wg.Done()
 				for {
-					if ctx.Err() != nil {
-						return
-					}
-					v, ok := <-jobs
-					if !ok {
-						return
-					}
 					select {
-					case results <- result[U]{value: fn(v)}:
 					case <-ctx.Done():
 						return
+					case v, ok := <-jobs:
+						if !ok {
+							return
+						}
+						select {
+						case results <- result[U]{value: fn(v)}:
+						case <-ctx.Done():
+							return
+						}
 					}
 				}
 			}()
@@ -155,7 +156,7 @@ func ParallelMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func
 		for {
 			if ctx.Err() != nil {
 				var zero U
-				yield(zero, vortex.Wrap("parallel.ParallelMap", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("parallel.ParallelMap"))
 				return
 			}
 			r, ok := <-results
@@ -231,7 +232,7 @@ func BatchMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func([]
 			}
 			if ctx.Err() != nil {
 				var zero U
-				yield(zero, vortex.Wrap("parallel.BatchMap", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("parallel.BatchMap"))
 				return false
 			}
 			results := fn(batch)
@@ -239,7 +240,7 @@ func BatchMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func([]
 			for _, r := range results {
 				if ctx.Err() != nil {
 					var zero U
-					yield(zero, vortex.Wrap("parallel.BatchMap", ctx.Err()))
+					yield(zero, vortex.WrapCancelled("parallel.BatchMap"))
 					return false
 				}
 				if !yield(r, nil) {
@@ -252,7 +253,7 @@ func BatchMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func([]
 		for v, err := range seq {
 			if ctx.Err() != nil {
 				var zero U
-				yield(zero, vortex.Wrap("parallel.BatchMap", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("parallel.BatchMap"))
 				return
 			}
 			if err != nil {
@@ -467,7 +468,7 @@ func OrderedParallelMap[T, U any](
 			select {
 			case <-ctx.Done():
 				var zero U
-				yield(zero, vortex.Wrap("parallel.OrderedParallelMap", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("parallel.OrderedParallelMap"))
 				return
 			case r, ok := <-results:
 				if !ok {

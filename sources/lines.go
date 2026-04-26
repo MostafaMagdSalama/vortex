@@ -18,6 +18,7 @@ func Lines(ctx context.Context, r io.Reader) iter.Seq2[string, error] {
 
 		for {
 			if ctx.Err() != nil {
+				yield("", vortex.WrapCancelled("sources.Lines"))
 				return
 			}
 			if !scanner.Scan() {
@@ -30,6 +31,7 @@ func Lines(ctx context.Context, r io.Reader) iter.Seq2[string, error] {
 
 		if err := scanner.Err(); err != nil {
 			if ctx.Err() != nil {
+				yield("", vortex.WrapCancelled("sources.Lines"))
 				return
 			}
 			yield("", vortex.Wrap("sources.Lines", err))
@@ -41,7 +43,7 @@ func Lines(ctx context.Context, r io.Reader) iter.Seq2[string, error] {
 func FileLines(ctx context.Context, path string) iter.Seq2[string, error] {
 	return func(yield func(string, error) bool) {
 		if ctx.Err() != nil {
-			yield("", vortex.Wrap("sources.FileLines", ctx.Err()))
+			yield("", vortex.WrapCancelled("sources.FileLines"))
 			return
 		}
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/MostafaMagdSalama/vortex"
 	"github.com/MostafaMagdSalama/vortex/iterx"
 	"github.com/MostafaMagdSalama/vortex/sources"
 	_ "modernc.org/sqlite"
@@ -297,8 +298,8 @@ func TestDBRows_Cancelled(t *testing.T) {
 		}
 	}
 
-	if !errors.Is(gotErr, context.Canceled) {
-		t.Fatalf("expected context.Canceled, got %v", gotErr)
+	if !errors.Is(gotErr, vortex.ErrCancelled) {
+		t.Fatalf("expected vortex.ErrCancelled, got %v", gotErr)
 	}
 }
 

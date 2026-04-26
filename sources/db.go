@@ -48,7 +48,7 @@ func DBRows[T any](ctx context.Context, db querier, query string, scan func(*sql
 
 		// check context before opening connection
 		if ctx.Err() != nil {
-			yield(zero, vortex.Wrap("sources.DBRows", ctx.Err()))
+			yield(zero, vortex.WrapCancelled("sources.DBRows"))
 			return
 		}
 
@@ -62,7 +62,7 @@ func DBRows[T any](ctx context.Context, db querier, query string, scan func(*sql
 		for rows.Next() {
 			// check context before processing each row
 			if ctx.Err() != nil {
-				yield(zero, vortex.Wrap("sources.DBRows", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("sources.DBRows"))
 				return
 			}
 

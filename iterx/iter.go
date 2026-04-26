@@ -8,6 +8,12 @@ import (
 	"github.com/MostafaMagdSalama/vortex"
 )
 
+// Pair holds two values of different types produced by Zip.
+type Pair[A, B any] struct {
+	First  A
+	Second B
+}
+
 // ValidationError represents an item that failed validation.
 type ValidationError[T any] struct {
 	Item   T
@@ -17,6 +23,11 @@ type ValidationError[T any] struct {
 // Error implements the error interface.
 func (e ValidationError[T]) Error() string {
 	return fmt.Sprintf("vortex: validation failed for item %v: %s", e.Item, e.Reason)
+}
+
+// Unwrap returns ErrValidation so errors.Is(err, vortex.ErrValidation) works.
+func (e ValidationError[T]) Unwrap() error {
+	return vortex.ErrValidation
 }
 
 // FilterSeq returns a new sequence containing only elements where fn returns true.
@@ -40,7 +51,7 @@ func Filter[T any](ctx context.Context, seq iter.Seq2[T, error], fn func(T) bool
 		for v, err := range seq {
 			if ctx.Err() != nil {
 				var zero T
-				yield(zero, vortex.Wrap("iterx.Filter", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("iterx.Filter"))
 				return
 			}
 			if err != nil {
@@ -78,7 +89,7 @@ func Map[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func(T) U) i
 		for v, err := range seq {
 			if ctx.Err() != nil {
 				var zero U
-				yield(zero, vortex.Wrap("iterx.Map", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("iterx.Map"))
 				return
 			}
 			if err != nil {
@@ -127,7 +138,7 @@ func Take[T any](ctx context.Context, seq iter.Seq2[T, error], n int) iter.Seq2[
 			}
 			if ctx.Err() != nil {
 				var zero T
-				yield(zero, vortex.Wrap("iterx.Take", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("iterx.Take"))
 				return
 			}
 			if err != nil {
@@ -174,7 +185,7 @@ func FlatMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func(T) 
 		for v, err := range seq {
 			if ctx.Err() != nil {
 				var zero U
-				yield(zero, vortex.Wrap("iterx.FlatMap", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("iterx.FlatMap"))
 				return
 			}
 			if err != nil {
@@ -187,7 +198,7 @@ func FlatMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func(T) 
 			for inner, errInner := range fn(v) {
 				if ctx.Err() != nil {
 					var zero U
-					yield(zero, vortex.Wrap("iterx.FlatMap", ctx.Err()))
+					yield(zero, vortex.WrapCancelled("iterx.FlatMap"))
 					return
 				}
 				if errInner != nil {
@@ -231,7 +242,7 @@ func TakeWhile[T any](ctx context.Context, seq iter.Seq2[T, error], fn func(T) b
 		for v, err := range seq {
 			if ctx.Err() != nil {
 				var zero T
-				yield(zero, vortex.Wrap("iterx.TakeWhile", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("iterx.TakeWhile"))
 				return
 			}
 			if err != nil {
@@ -251,10 +262,10 @@ func TakeWhile[T any](ctx context.Context, seq iter.Seq2[T, error], fn func(T) b
 	}
 }
 
-// ZipSeq combines two sequences into pairs, yielding [2]any{a, b} for each
+// ZipSeq combines two sequences into pairs, yielding Pair[A, B] for each
 // corresponding element. It stops as soon as the shortest sequence runs out.
-func ZipSeq[A, B any](ctx context.Context, a iter.Seq[A], b iter.Seq[B]) iter.Seq[[2]any] {
-	return func(yield func([2]any) bool) {
+func ZipSeq[A, B any](ctx context.Context, a iter.Seq[A], b iter.Seq[B]) iter.Seq[Pair[A, B]] {
+	return func(yield func(Pair[A, B]) bool) {
 		nextA, stopA := iter.Pull(a)
 		defer stopA()
 
@@ -276,18 +287,18 @@ func ZipSeq[A, B any](ctx context.Context, a iter.Seq[A], b iter.Seq[B]) iter.Se
 				return
 			}
 
-			if !yield([2]any{va, vb}) {
+			if !yield(Pair[A, B]{First: va, Second: vb}) {
 				return
 			}
 		}
 	}
 }
 
-// Zip combines two sequences into pairs, yielding [2]any{a, b} for each
+// Zip combines two sequences into pairs, yielding Pair[A, B] for each
 // corresponding valid element. It skips errors from both sequences independently,
 // yielding the errors directly in the stream. It stops as soon as either sequence runs out of valid elements safely.
-func Zip[A, B any](ctx context.Context, a iter.Seq2[A, error], b iter.Seq2[B, error]) iter.Seq2[[2]any, error] {
-	return func(yield func([2]any, error) bool) {
+func Zip[A, B any](ctx context.Context, a iter.Seq2[A, error], b iter.Seq2[B, error]) iter.Seq2[Pair[A, B], error] {
+	return func(yield func(Pair[A, B], error) bool) {
 		nextA, stopA := iter.Pull2(a)
 		defer stopA()
 
@@ -296,8 +307,8 @@ func Zip[A, B any](ctx context.Context, a iter.Seq2[A, error], b iter.Seq2[B, er
 
 		for {
 			if ctx.Err() != nil {
-				var zero [2]any
-				yield(zero, vortex.Wrap("iterx.Zip", ctx.Err()))
+				var zero Pair[A, B]
+				yield(zero, vortex.WrapCancelled("iterx.Zip"))
 				return
 			}
 
@@ -308,8 +319,8 @@ func Zip[A, B any](ctx context.Context, a iter.Seq2[A, error], b iter.Seq2[B, er
 			// Get next valid item from a, yielding any errors encountered along the way
 			for {
 				if ctx.Err() != nil {
-					var zero [2]any
-					yield(zero, vortex.Wrap("iterx.Zip", ctx.Err()))
+					var zero Pair[A, B]
+					yield(zero, vortex.WrapCancelled("iterx.Zip"))
 					return
 				}
 				va, errA, okA = nextA()
@@ -317,7 +328,7 @@ func Zip[A, B any](ctx context.Context, a iter.Seq2[A, error], b iter.Seq2[B, er
 					break // 'a' ran out
 				}
 				if errA != nil {
-					var zero [2]any
+					var zero Pair[A, B]
 					if !yield(zero, vortex.Wrap("iterx.Zip", errA)) {
 						return
 					}
@@ -336,8 +347,8 @@ func Zip[A, B any](ctx context.Context, a iter.Seq2[A, error], b iter.Seq2[B, er
 			// Get next valid item from b, yielding any errors encountered along the way
 			for {
 				if ctx.Err() != nil {
-					var zero [2]any
-					yield(zero, vortex.Wrap("iterx.Zip", ctx.Err()))
+					var zero Pair[A, B]
+					yield(zero, vortex.WrapCancelled("iterx.Zip"))
 					return
 				}
 				vb, errB, okB = nextB()
@@ -345,7 +356,7 @@ func Zip[A, B any](ctx context.Context, a iter.Seq2[A, error], b iter.Seq2[B, er
 					break // 'b' ran out
 				}
 				if errB != nil {
-					var zero [2]any
+					var zero Pair[A, B]
 					if !yield(zero, vortex.Wrap("iterx.Zip", errB)) {
 						return
 					}
@@ -357,7 +368,7 @@ func Zip[A, B any](ctx context.Context, a iter.Seq2[A, error], b iter.Seq2[B, er
 				return
 			}
 
-			if !yield([2]any{va, vb}, nil) {
+			if !yield(Pair[A, B]{First: va, Second: vb}, nil) {
 				return
 			}
 		}
@@ -395,7 +406,7 @@ func Validate[T any](ctx context.Context, seq iter.Seq2[T, error], fn func(T) (b
 		for item, err := range seq {
 			if ctx.Err() != nil {
 				var zero T
-				yield(zero, vortex.Wrap("iterx.Validate", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("iterx.Validate"))
 				return
 			}
 			if err != nil {

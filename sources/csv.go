@@ -13,7 +13,7 @@ import (
 func CSVRows(ctx context.Context, r io.Reader) iter.Seq2[[]string, error] {
 	return func(yield func([]string, error) bool) {
 		if ctx.Err() != nil {
-			yield(nil, vortex.Wrap("sources.CSVRows", ctx.Err()))
+			yield(nil, vortex.WrapCancelled("sources.CSVRows"))
 			return
 		}
 
@@ -24,7 +24,7 @@ func CSVRows(ctx context.Context, r io.Reader) iter.Seq2[[]string, error] {
 
 		for {
 			if ctx.Err() != nil {
-				yield(nil, vortex.Wrap("sources.CSVRows", ctx.Err()))
+				yield(nil, vortex.WrapCancelled("sources.CSVRows"))
 				return
 			}
 

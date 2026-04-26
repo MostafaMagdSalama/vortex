@@ -37,7 +37,7 @@ func JSONLines[T any](ctx context.Context, r io.Reader) iter.Seq2[T, error] {
 		var zero T
 
 		if ctx.Err() != nil {
-			yield(zero, vortex.Wrap("sources.JSONLines", ctx.Err()))
+			yield(zero, vortex.WrapCancelled("sources.JSONLines"))
 			return
 		}
 
@@ -46,7 +46,7 @@ func JSONLines[T any](ctx context.Context, r io.Reader) iter.Seq2[T, error] {
 
 		for scanner.Scan() {
 			if ctx.Err() != nil {
-				yield(zero, vortex.Wrap("sources.JSONLines", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("sources.JSONLines"))
 				return
 			}
 
