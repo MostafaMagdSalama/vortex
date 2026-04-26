@@ -25,7 +25,7 @@ func ContainsSeq[T comparable](ctx context.Context, seq iter.Seq[T], target T) b
 func Contains[T comparable](ctx context.Context, seq iter.Seq2[T, error], target T) (bool, error) {
 	for v, err := range seq {
 		if ctx.Err() != nil {
-			return false, vortex.Wrap("iterx.Contains", ctx.Err())
+			return false, vortex.WrapCancelled("iterx.Contains")
 		}
 		if err != nil {
 			return false, vortex.Wrap("iterx.Contains", err)
