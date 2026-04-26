@@ -33,7 +33,7 @@ func Flatten[T any](ctx context.Context, seq iter.Seq2[[]T, error]) iter.Seq2[T,
 		for slice, err := range seq {
 			if ctx.Err() != nil {
 				var zero T
-				yield(zero, vortex.Wrap("iterx.Flatten", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("iterx.Flatten"))
 				return
 			}
 			if err != nil {
@@ -46,7 +46,7 @@ func Flatten[T any](ctx context.Context, seq iter.Seq2[[]T, error]) iter.Seq2[T,
 			for _, v := range slice {
 				if ctx.Err() != nil {
 					var zero T
-					yield(zero, vortex.Wrap("iterx.Flatten", ctx.Err()))
+					yield(zero, vortex.WrapCancelled("iterx.Flatten"))
 					return
 				}
 				if !yield(v, nil) {
