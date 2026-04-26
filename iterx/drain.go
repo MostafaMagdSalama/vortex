@@ -14,7 +14,7 @@ import (
 func DrainSeq[T any](ctx context.Context, seq iter.Seq[T], fn func(T) error) error {
 	for v := range seq {
 		if ctx.Err() != nil {
-			return vortex.Wrap("iterx.DrainSeq", ctx.Err())
+			return vortex.WrapCancelled("iterx.DrainSeq")
 		}
 		if err := fn(v); err != nil {
 			return vortex.Wrap("iterx.DrainSeq", err)
@@ -30,7 +30,7 @@ func DrainSeq[T any](ctx context.Context, seq iter.Seq[T], fn func(T) error) err
 func Drain[T any](ctx context.Context, seq iter.Seq2[T, error], fn func(T) error) error {
 	for v, err := range seq {
 		if ctx.Err() != nil {
-			return vortex.Wrap("iterx.Drain", ctx.Err())
+			return vortex.WrapCancelled("iterx.Drain")
 		}
 		if err != nil {
 			return vortex.Wrap("iterx.Drain", err)
