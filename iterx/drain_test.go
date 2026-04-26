@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MostafaMagdSalama/vortex"
 	"github.com/MostafaMagdSalama/vortex/iterx"
 )
 
@@ -135,7 +136,7 @@ func TestDrain(t *testing.T) {
 			seqErrors:     map[int]error{},
 			fn:            func(n int) error { return nil },
 			expectedItems: []int{},
-			expectedErr:   context.Canceled,
+			expectedErr:   vortex.ErrCancelled,
 			cancelCtx:     true,
 		},
 
