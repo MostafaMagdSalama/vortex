@@ -254,7 +254,7 @@ func ExampleZip() {
 	values := slices.Values([]int{100, 200}) // Notice: shorter sequence!
 
 	for pair := range iterx.ZipSeq(ctx, keys, values) {
-		fmt.Printf("%v: %v\n", pair[0], pair[1])
+		fmt.Printf("%v: %v\n", pair.First, pair.Second)
 	}
 	// Output:
 	// A: 100
