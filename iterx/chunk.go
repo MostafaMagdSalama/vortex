@@ -53,7 +53,7 @@ func Chunk[T any](ctx context.Context, seq iter.Seq2[T, error], n int) iter.Seq2
 
 		for v, err := range seq {
 			if ctx.Err() != nil {
-				yield(nil, vortex.Wrap("iterx.Chunk", ctx.Err()))
+				yield(nil, vortex.WrapCancelled("iterx.Chunk"))
 				return
 			}
 			if err != nil {
@@ -73,7 +73,7 @@ func Chunk[T any](ctx context.Context, seq iter.Seq2[T, error], n int) iter.Seq2
 
 		if len(batch) > 0 {
 			if ctx.Err() != nil {
-				yield(nil, vortex.Wrap("iterx.Chunk", ctx.Err()))
+				yield(nil, vortex.WrapCancelled("iterx.Chunk"))
 				return
 			}
 			yield(batch, nil)
