@@ -35,14 +35,15 @@ func Distinct[T comparable](ctx context.Context, seq iter.Seq2[T, error]) iter.S
 		for v, err := range seq {
 			if ctx.Err() != nil {
 				var zero T
-				yield(zero, vortex.Wrap("iterx.Distinct", ctx.Err()))
+				yield(zero, vortex.WrapCancelled("iterx.Distinct"))
 				return
 			}
 			if err != nil {
 				var zero T
-				yield(zero, vortex.Wrap("iterx.Distinct", err))
-				return
-
+				if !yield(zero, vortex.Wrap("iterx.Distinct", err)) {
+					return
+				}
+				continue
 			}
 			if !seen[v] {
 				seen[v] = true
