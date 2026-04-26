@@ -14,8 +14,8 @@
 //	    fmt.Printf("Operation: %s, Cause: %v\n", vErr.Op, vErr.Err)
 //	}
 //
-// Vortex also provides Sentinel Errors for predictable failure states, like [ErrCancelled],
-// which can be checked using [errors.Is].
+// Vortex also provides Sentinel Errors for predictable failure states, like [ErrCancelled]
+// and [ErrValidation], which can be checked using [errors.Is].
 package vortex
 
 import (
@@ -48,9 +48,22 @@ func (e *Error) Unwrap() error {
 
 // Wrap is a helper to easily construct these errors.
 // It returns nil if the provided err is nil.
+// If err is already a *Error, Wrap replaces the Op but preserves the
+// underlying cause to avoid nested vortex.Error chains.
 func Wrap(op string, err error) error {
 	if err == nil {
 		return nil
 	}
+	var ve *Error
+	if errors.As(err, &ve) {
+		return &Error{Op: op, Err: ve.Err}
+	}
 	return &Error{Op: op, Err: err}
+}
+
+// WrapCancelled returns a cancellation error for the given operation.
+// Use this instead of Wrap(op, ctx.Err()) so that errors.Is(err, ErrCancelled)
+// works as documented.
+func WrapCancelled(op string) error {
+	return &Error{Op: op, Err: ErrCancelled}
 }
