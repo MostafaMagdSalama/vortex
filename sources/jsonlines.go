@@ -94,7 +94,7 @@ func JSONLinesFile[T any](ctx context.Context, path string) iter.Seq2[T, error] 
 		var zero T
 
 		if ctx.Err() != nil {
-			yield(zero, vortex.Wrap("sources.JSONLinesFile", ctx.Err()))
+			yield(zero, vortex.WrapCancelled("sources.JSONLinesFile"))
 			return
 		}
 

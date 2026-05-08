@@ -184,6 +184,29 @@ func TestJSONLines_Cancelled(t *testing.T) {
 	}
 }
 
+// JSONLinesFile — cancelled context stops immediately with ErrCancelled
+func TestJSONLinesFile_Cancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	tmp := filepath.Join(t.TempDir(), "test.jsonl")
+	if err := os.WriteFile(tmp, []byte(`{"level":"info","message":"a","service":"x"}`+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var gotErr error
+	for _, err := range sources.JSONLinesFile[LogEntry](ctx, tmp) {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+
+	if !errors.Is(gotErr, vortex.ErrCancelled) {
+		t.Fatalf("expected vortex.ErrCancelled, got %v", gotErr)
+	}
+}
+
 // JSONLinesFile — reads from file correctly
 func TestJSONLinesFile_Basic(t *testing.T) {
 	content := `{"level":"info","message":"started","service":"api"}
