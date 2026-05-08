@@ -153,6 +153,34 @@ func TestFlatten_CancelledContext(t *testing.T) {
 	}
 }
 
+func TestFlatten_CancelledDuringInner(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	seq := func(yield func([]int, error) bool) {
+		if !yield([]int{1, 2, 3}, nil) {
+			return
+		}
+		yield([]int{4, 5, 6}, nil)
+	}
+	var got []int
+	var gotErr error
+	for v, err := range iterx.Flatten(ctx, seq) {
+		if err != nil {
+			gotErr = err
+			break
+		}
+		got = append(got, v)
+		if v == 2 {
+			cancel() // cancel inside inner slice — next inner iteration detects it
+		}
+	}
+	if !errors.Is(gotErr, vortex.ErrCancelled) {
+		t.Fatalf("expected ErrCancelled, got %v", gotErr)
+	}
+	if len(got) > 3 {
+		t.Fatalf("expected at most 3 items before cancel, got %v", got)
+	}
+}
+
 func TestFlatten_StopsEarly(t *testing.T) {
 	callCount := 0
 	seq := func(yield func([]int, error) bool) {

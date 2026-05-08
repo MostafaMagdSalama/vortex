@@ -160,6 +160,36 @@ func TestMap_CancelledContext(t *testing.T) {
 	}
 }
 
+func TestMap_ContinuesAfterError(t *testing.T) {
+	sentinelErr := errors.New("map stream error")
+	seq := func(yield func(int, error) bool) {
+		if !yield(1, nil) {
+			return
+		}
+		if !yield(0, sentinelErr) {
+			return
+		}
+		if !yield(3, nil) {
+			return
+		}
+	}
+	var got []string
+	var errCount int
+	for v, err := range iterx.Map(context.Background(), seq, func(n int) string { return fmt.Sprintf("x%d", n) }) {
+		if err != nil {
+			errCount++
+			continue // consumer continues — exercises the continue in Map
+		}
+		got = append(got, v)
+	}
+	if !slices.Equal(got, []string{"x1", "x3"}) {
+		t.Fatalf("expected [x1 x3], got %v", got)
+	}
+	if errCount != 1 {
+		t.Fatalf("expected 1 error, got %d", errCount)
+	}
+}
+
 func TestMap_StopsEarly(t *testing.T) {
 	callCount := 0
 	seq := func(yield func(int, error) bool) {

@@ -171,6 +171,36 @@ func TestFilter_CancelledContext(t *testing.T) {
 	}
 }
 
+func TestFilter_ContinuesAfterError(t *testing.T) {
+	sentinelErr := errors.New("filter stream error")
+	seq := func(yield func(int, error) bool) {
+		if !yield(2, nil) {
+			return
+		}
+		if !yield(0, sentinelErr) {
+			return
+		}
+		if !yield(4, nil) {
+			return
+		}
+	}
+	var got []int
+	var errCount int
+	for v, err := range iterx.Filter(context.Background(), seq, func(n int) bool { return n%2 == 0 }) {
+		if err != nil {
+			errCount++
+			continue // consumer continues — exercises the continue in Filter
+		}
+		got = append(got, v)
+	}
+	if !slices.Equal(got, []int{2, 4}) {
+		t.Fatalf("expected [2 4], got %v", got)
+	}
+	if errCount != 1 {
+		t.Fatalf("expected 1 error, got %d", errCount)
+	}
+}
+
 func TestFilter_StopsEarly(t *testing.T) {
 	callCount := 0
 	seq := func(yield func(int, error) bool) {

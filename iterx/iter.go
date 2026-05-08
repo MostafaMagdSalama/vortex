@@ -111,18 +111,16 @@ func TakeSeq[T any](ctx context.Context, seq iter.Seq[T], n int) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		i := 0
 		for v := range seq {
+			if i >= n {
+				return
+			}
 			if ctx.Err() != nil {
 				return
 			}
-
 			if !yield(v) {
 				return
 			}
 			i++
-			if i >= n {
-				return
-			}
-
 		}
 	}
 }

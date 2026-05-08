@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/MostafaMagdSalama/vortex"
 	"github.com/MostafaMagdSalama/vortex/iterx"
 )
 
@@ -154,6 +155,37 @@ func TestChunk_CancelledContext(t *testing.T) {
 
 	if len(result) > 0 {
 		t.Fatalf("expected no results with cancelled context, got %d chunks", len(result))
+	}
+}
+
+func TestChunk_CancelledBeforeTrailingBatch(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	seq := func(yield func(rune, error) bool) {
+		if !yield('a', nil) {
+			return
+		}
+		if !yield('b', nil) {
+			return
+		}
+		if !yield('c', nil) {
+			return
+		}
+		cancel() // cancel after last item, before trailing batch
+	}
+	var got [][]rune
+	var gotErr error
+	for chunk, err := range iterx.Chunk(ctx, seq, 2) {
+		if err != nil {
+			gotErr = err
+			break
+		}
+		got = append(got, slices.Clone(chunk))
+	}
+	if len(got) != 1 || !slices.Equal(got[0], []rune{'a', 'b'}) {
+		t.Fatalf("expected [['a','b']] only, got %v", got)
+	}
+	if !errors.Is(gotErr, vortex.ErrCancelled) {
+		t.Fatalf("expected ErrCancelled for trailing batch, got %v", gotErr)
 	}
 }
 

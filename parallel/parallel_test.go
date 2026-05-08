@@ -562,3 +562,92 @@ func ExampleOrderedParallelMapSeq_strings() {
 	// WORLD
 	// FOO
 }
+
+func TestBatchMap_CancelledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var gotErr error
+	for _, err := range parallel.BatchMap(ctx, seq2FromSlice([]int{1, 2, 3, 4}), func(b []int) []int { return b }, 2) {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+
+	if gotErr == nil {
+		t.Fatal("expected error from cancelled context, got nil")
+	}
+}
+
+func TestBatchMap_StopsEarlyOnValue(t *testing.T) {
+	callCount := 0
+	input := seq2FromSlice([]int{1, 2, 3, 4, 5, 6})
+
+	var got []int
+	for v, err := range parallel.BatchMap(context.Background(), input, func(b []int) []int {
+		callCount++
+		return b
+	}, 2) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, v)
+		if len(got) == 2 {
+			break
+		}
+	}
+
+	if len(got) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(got))
+	}
+	if callCount > 2 {
+		t.Fatalf("expected fn to stop being called after consumer break, got %d calls", callCount)
+	}
+}
+
+func TestBatchMap_StopsEarlyOnError(t *testing.T) {
+	sentinelErr := errors.New("upstream error")
+	input := seq2WithError([]int{1, 2, 3, 4}, 1, sentinelErr)
+
+	var gotErr error
+	var got []int
+	for v, err := range parallel.BatchMap(context.Background(), input, func(b []int) []int { return b }, 2) {
+		if err != nil {
+			gotErr = err
+			break // consumer stops on first error
+		}
+		got = append(got, v)
+	}
+
+	if !errors.Is(gotErr, sentinelErr) {
+		t.Fatalf("expected sentinel error, got %v", gotErr)
+	}
+	// batch [1] was flushed before the error, so got=[1]
+	if len(got) != 1 || got[0] != 1 {
+		t.Fatalf("expected [1] before error, got %v", got)
+	}
+}
+
+func TestBatchMapSeq_StopsEarly(t *testing.T) {
+	callCount := 0
+	input := slices.Values([]int{1, 2, 3, 4, 5, 6})
+
+	var got []int
+	for v := range parallel.BatchMapSeq(context.Background(), input, func(b []int) []int {
+		callCount++
+		return b
+	}, 2) {
+		got = append(got, v)
+		if len(got) == 2 {
+			break
+		}
+	}
+
+	if len(got) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(got))
+	}
+	if callCount > 2 {
+		t.Fatalf("expected fn to stop being called after consumer break, got %d calls", callCount)
+	}
+}

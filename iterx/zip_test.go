@@ -204,6 +204,50 @@ func TestZip_CancelledContext(t *testing.T) {
 	}
 }
 
+func TestZip_CancelledInErrorLoopA(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	errA := errors.New("error from a")
+	a := func(yield func(string, error) bool) {
+		if !yield("", errA) {
+			return
+		}
+		yield("real", nil)
+	}
+	b := seqToSeq2(slices.Values([]int{1, 2}))
+	var errCount int
+	for _, err := range iterx.Zip(ctx, a, b) {
+		if err != nil {
+			errCount++
+			cancel() // cancel and continue — next inner-loop iteration detects cancelled ctx
+		}
+	}
+	if errCount < 1 {
+		t.Fatalf("expected at least 1 error, got %d", errCount)
+	}
+}
+
+func TestZip_CancelledInErrorLoopB(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	errB := errors.New("error from b")
+	a := seqToSeq2(slices.Values([]string{"a1", "a2"}))
+	b := func(yield func(int, error) bool) {
+		if !yield(0, errB) {
+			return
+		}
+		yield(99, nil)
+	}
+	var errCount int
+	for _, err := range iterx.Zip(ctx, a, b) {
+		if err != nil {
+			errCount++
+			cancel() // cancel and continue — next inner-loop iteration for b detects it
+		}
+	}
+	if errCount < 1 {
+		t.Fatalf("expected at least 1 error, got %d", errCount)
+	}
+}
+
 func TestZip_StopsEarly(t *testing.T) {
 	aCallCount := 0
 	a := func(yield func(string, error) bool) {

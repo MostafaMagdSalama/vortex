@@ -160,6 +160,36 @@ func TestDistinct_StopsEarly(t *testing.T) {
 	}
 }
 
+func TestDistinct_ContinuesAfterError(t *testing.T) {
+	sentinelErr := errors.New("stream error")
+	seq := func(yield func(rune, error) bool) {
+		if !yield('a', nil) {
+			return
+		}
+		if !yield(0, sentinelErr) {
+			return
+		}
+		if !yield('b', nil) {
+			return
+		}
+	}
+	var got []rune
+	var errCount int
+	for v, err := range iterx.Distinct(context.Background(), seq) {
+		if err != nil {
+			errCount++
+			continue // consumer continues — exercises the continue in Distinct
+		}
+		got = append(got, v)
+	}
+	if !slices.Equal(got, []rune{'a', 'b'}) {
+		t.Fatalf("expected ['a','b'], got %v", got)
+	}
+	if errCount != 1 {
+		t.Fatalf("expected 1 error, got %d", errCount)
+	}
+}
+
 func TestDistinct_PreservesOrder(t *testing.T) {
 
 	input := []rune{'c', 'a', 'b', 'a', 'c', 'b'}
