@@ -58,6 +58,71 @@ func TestCSVRows_Error(t *testing.T) {
 	}
 }
 
+// failingReader returns valid bytes once, then a non-EOF I/O error on every
+// subsequent call. csv.Reader keeps surfacing that error, so without the
+// terminal-error stop in CSVRows the loop would yield it forever.
+type failingReader struct {
+	data    []byte
+	pos     int
+	errOnce error
+}
+
+func (f *failingReader) Read(p []byte) (int, error) {
+	if f.pos < len(f.data) {
+		n := copy(p, f.data[f.pos:])
+		f.pos += n
+		return n, nil
+	}
+	return 0, f.errOnce
+}
+
+func TestCSVRows_StopsOnIOError(t *testing.T) {
+	r := &failingReader{
+		data:    []byte("a,b,c\n1,2,3\n"),
+		errOnce: errors.New("disk gone"),
+	}
+
+	rows := 0
+	errs := 0
+	for _, err := range sources.CSVRows(context.Background(), r) {
+		if err != nil {
+			errs++
+			if errs > 5 {
+				t.Fatal("CSVRows looped on terminal I/O error")
+			}
+			continue
+		}
+		rows++
+	}
+
+	if rows != 2 {
+		t.Fatalf("expected 2 valid rows before error, got %d", rows)
+	}
+	if errs != 1 {
+		t.Fatalf("expected exactly 1 error then stop, got %d", errs)
+	}
+}
+
+func TestCSVRows_ContinuesOnParseError(t *testing.T) {
+	// Row 2 has too many fields → csv.ParseError → recoverable.
+	// Iteration should yield row 1, then the error, then row 3.
+	input := "a,b\n1,2\n3,4,5\n6,7\n"
+
+	rows := 0
+	errs := 0
+	for _, err := range sources.CSVRows(context.Background(), strings.NewReader(input)) {
+		if err != nil {
+			errs++
+			continue
+		}
+		rows++
+	}
+
+	if rows != 3 || errs != 1 {
+		t.Fatalf("expected 3 rows + 1 parse error, got %d rows, %d errs", rows, errs)
+	}
+}
+
 func TestLines(t *testing.T) {
 	var lines []string
 	for line, err := range sources.Lines(context.Background(), strings.NewReader("line1\nline2\nline3")) {

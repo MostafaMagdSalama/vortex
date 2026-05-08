@@ -15,6 +15,11 @@ import (
 // Each line must be a valid JSON object — empty lines are skipped.
 // Stops immediately if ctx is cancelled or the consumer breaks early.
 //
+// Cancellation: ctx is checked between lines. A blocked read on the underlying
+// io.Reader (e.g. a slow HTTP body) will not be interrupted by ctx alone —
+// close the reader to unblock it. For HTTP, cancel the request context or call
+// resp.Body.Close from another goroutine.
+//
 // Works with any io.Reader — files, HTTP responses, buffers:
 //
 //	// from file
@@ -82,6 +87,9 @@ func JSONLines[T any](ctx context.Context, r io.Reader) iter.Seq2[T, error] {
 
 // JSONLinesFile opens a file and returns a lazy sequence of decoded JSON objects.
 // Each line must be a valid JSON object — empty lines are skipped.
+//
+// Cancellation: ctx is checked between lines. Closing the file from another
+// goroutine will also interrupt a blocked read.
 //
 // example:
 //

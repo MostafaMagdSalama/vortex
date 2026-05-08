@@ -107,8 +107,12 @@ func Map[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func(T) U) i
 }
 
 // TakeSeq returns the first n elements.
+// If n <= 0, no elements are pulled from the source.
 func TakeSeq[T any](ctx context.Context, seq iter.Seq[T], n int) iter.Seq[T] {
 	return func(yield func(T) bool) {
+		if n <= 0 {
+			return
+		}
 		i := 0
 		for v := range seq {
 			if i >= n {
@@ -127,8 +131,12 @@ func TakeSeq[T any](ctx context.Context, seq iter.Seq[T], n int) iter.Seq[T] {
 
 // Take returns the first n elements.
 // Errors from the underlying sequence are passed through untouched, and do not count towards n.
+// If n <= 0, no elements are pulled from the source.
 func Take[T any](ctx context.Context, seq iter.Seq2[T, error], n int) iter.Seq2[T, error] {
 	return func(yield func(T, error) bool) {
+		if n <= 0 {
+			return
+		}
 		i := 0
 		for v, err := range seq {
 			if i >= n {

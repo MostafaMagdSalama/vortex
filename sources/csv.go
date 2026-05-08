@@ -3,6 +3,7 @@ package sources
 import (
 	"context"
 	"encoding/csv"
+	"errors"
 	"io"
 	"iter"
 
@@ -10,6 +11,15 @@ import (
 )
 
 // CSVRows returns a lazy sequence of rows from a CSV reader.
+//
+// Recoverable parse errors (wrong field count, bad quoting) are yielded inline
+// and iteration continues. Non-recoverable I/O errors are yielded once and
+// iteration stops.
+//
+// Cancellation: ctx is checked between rows. A blocked read on the underlying
+// io.Reader (e.g. a slow HTTP body) will not be interrupted by ctx alone —
+// close the reader to unblock it. For HTTP, cancel the request context or call
+// resp.Body.Close from another goroutine.
 func CSVRows(ctx context.Context, r io.Reader) iter.Seq2[[]string, error] {
 	return func(yield func([]string, error) bool) {
 		if ctx.Err() != nil {
@@ -33,10 +43,19 @@ func CSVRows(ctx context.Context, r io.Reader) iter.Seq2[[]string, error] {
 				return
 			}
 			if err != nil {
-				if !yield(nil, vortex.Wrap("sources.CSVRows", err)) {
-					return
+				// csv.ParseError is per-record and recoverable; the next Read
+				// continues at the next record. Any other error (I/O failure,
+				// closed reader) is terminal — csv.Reader will keep returning
+				// it, so surface it once and stop.
+				var perr *csv.ParseError
+				if errors.As(err, &perr) {
+					if !yield(nil, vortex.Wrap("sources.CSVRows", err)) {
+						return
+					}
+					continue
 				}
-				continue
+				yield(nil, vortex.Wrap("sources.CSVRows", err))
+				return
 			}
 
 			if !yield(row, nil) {

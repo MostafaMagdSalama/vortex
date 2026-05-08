@@ -43,9 +43,16 @@
 //
 // # Memory notes
 //
-// All functions stream values one at a time except Reverse, which buffers the
-// full sequence in memory before yielding results. Reverse is not suitable for
-// infinite or very large sequences.
+// Most functions stream values one at a time and use O(1) memory. The
+// exceptions:
+//
+//   - Reverse — buffers the entire sequence before yielding (O(n)). Not
+//     suitable for infinite or very large sequences.
+//   - Distinct / DistinctSeq — keeps a hash set of every unique value seen
+//     so far (O(unique items)). For high-cardinality streams, deduplicate
+//     per chunk (via iterx.Chunk) or use a probabilistic structure outside
+//     the pipeline.
+//   - Chunk / ChunkSeq — holds at most one batch of size n at a time.
 //
 // # Context cancellation
 //

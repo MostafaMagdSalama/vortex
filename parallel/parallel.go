@@ -20,6 +20,17 @@ type result[U any] struct {
 	err   error
 }
 
+// seqToSeq2 lifts a plain iter.Seq into iter.Seq2 with always-nil error.
+func seqToSeq2[T any](seq iter.Seq[T]) iter.Seq2[T, error] {
+	return func(yield func(T, error) bool) {
+		for v := range seq {
+			if !yield(v, nil) {
+				return
+			}
+		}
+	}
+}
+
 // ParallelMapSeq processes each element concurrently with n workers.
 func ParallelMapSeq[T, U any](ctx context.Context, seq iter.Seq[T], fn func(T) U, workers int) iter.Seq[U] {
 	if workers <= 0 {
@@ -60,6 +71,14 @@ func ParallelMapSeq[T, U any](ctx context.Context, seq iter.Seq[T], fn func(T) U
 
 		go func() {
 			defer close(jobs)
+			// Source seq closures may panic (e.g. a decoder bug). Recover so
+			// the panic doesn't escape the worker pool and crash the program.
+			// Plain-Seq variant has no error channel — cancel to drain workers.
+			defer func() {
+				if r := recover(); r != nil {
+					cancel()
+				}
+			}()
 			for v := range seq {
 				if ctx.Err() != nil {
 					return
@@ -144,6 +163,16 @@ func ParallelMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func
 
 		go func() {
 			defer close(jobs)
+			// Recover panics from the source seq closure and surface as a
+			// result error rather than crashing the program.
+			defer func() {
+				if r := recover(); r != nil {
+					select {
+					case results <- result[U]{err: vortex.Wrap("parallel.ParallelMap", fmt.Errorf("source panic: %v", r))}:
+					case <-ctx.Done():
+					}
+				}
+			}()
 			for v, err := range seq {
 				if ctx.Err() != nil {
 					return
@@ -200,7 +229,7 @@ func BatchMapSeq[T, U any](ctx context.Context, seq iter.Seq[T], fn func([]T) []
 		panic("vortex: batchSize must be > 0")
 	}
 	return func(yield func(U) bool) {
-		var batch []T
+		batch := make([]T, 0, batchSize)
 
 		flush := func() bool {
 			if len(batch) == 0 {
@@ -210,7 +239,10 @@ func BatchMapSeq[T, U any](ctx context.Context, seq iter.Seq[T], fn func([]T) []
 				return false
 			}
 			results := fn(batch)
-			batch = batch[:0]
+			// Allocate a fresh batch instead of `batch[:0]` so callers that
+			// keep a reference to the slice passed into fn are not aliased
+			// by the next round of appends.
+			batch = make([]T, 0, batchSize)
 			for _, r := range results {
 				if ctx.Err() != nil {
 					return false
@@ -247,7 +279,7 @@ func BatchMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func([]
 		panic("vortex: batchSize must be > 0")
 	}
 	return func(yield func(U, error) bool) {
-		var batch []T
+		batch := make([]T, 0, batchSize)
 
 		flush := func() bool {
 			if len(batch) == 0 {
@@ -259,7 +291,8 @@ func BatchMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func([]
 				return false
 			}
 			results := fn(batch)
-			batch = batch[:0]
+			// Fresh allocation — see BatchMapSeq for the aliasing rationale.
+			batch = make([]T, 0, batchSize)
 			for _, r := range results {
 				if ctx.Err() != nil {
 					var zero U
@@ -357,6 +390,13 @@ func OrderedParallelMapSeq[T, U any](
 
 		go func() {
 			defer close(tasks)
+			// Recover panics from the source seq closure. Plain-Seq variant
+			// has no error channel — cancel so workers and consumer drain.
+			defer func() {
+				if r := recover(); r != nil {
+					cancel()
+				}
+			}()
 
 			i := 0
 			for v := range seq {
@@ -474,8 +514,19 @@ func OrderedParallelMap[T, U any](
 
 		go func() {
 			defer close(tasks)
-
+			// Capture the index that would be assigned next so a panic from
+			// the source seq closure surfaces at a deterministic position
+			// rather than crashing the program.
 			i := 0
+			defer func() {
+				if r := recover(); r != nil {
+					select {
+					case results <- result[U]{index: i, err: vortex.Wrap("parallel.OrderedParallelMap", fmt.Errorf("source panic: %v", r))}:
+					case <-ctx.Done():
+					}
+				}
+			}()
+
 			for v, err := range seq {
 				if ctx.Err() != nil {
 					return
@@ -544,4 +595,311 @@ func OrderedParallelMap[T, U any](
 			}
 		}
 	}
+}
+
+// ParallelMapErr applies fn concurrently with `workers` goroutines. Both
+// errors yielded by seq and errors returned by fn are wrapped with
+// vortex.Wrap and yielded inline. Output order is unspecified.
+//
+// fn must be safe to call concurrently. A panic inside fn is recovered
+// and surfaced as a worker error so it cannot crash the program.
+func ParallelMapErr[T, U any](
+	ctx context.Context,
+	seq iter.Seq2[T, error],
+	fn func(T) (U, error),
+	workers int,
+) iter.Seq2[U, error] {
+	if workers <= 0 {
+		panic("vortex: workers must be > 0")
+	}
+	return func(yield func(U, error) bool) {
+		if ctx.Err() != nil {
+			var zero U
+			yield(zero, vortex.WrapCancelled("parallel.ParallelMapErr"))
+			return
+		}
+
+		jobs := make(chan T, workers)
+		results := make(chan result[U], workers*2)
+		var wg sync.WaitGroup
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						select {
+						case results <- result[U]{err: vortex.Wrap("parallel.ParallelMapErr", fmt.Errorf("worker panic: %v", r))}:
+						case <-ctx.Done():
+						}
+					}
+				}()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case v, ok := <-jobs:
+						if !ok {
+							return
+						}
+						u, err := fn(v)
+						if err != nil {
+							select {
+							case results <- result[U]{err: vortex.Wrap("parallel.ParallelMapErr", err)}:
+							case <-ctx.Done():
+								return
+							}
+							continue
+						}
+						select {
+						case results <- result[U]{value: u}:
+						case <-ctx.Done():
+							return
+						}
+					}
+				}
+			}()
+		}
+
+		go func() {
+			defer close(jobs)
+			defer func() {
+				if r := recover(); r != nil {
+					select {
+					case results <- result[U]{err: vortex.Wrap("parallel.ParallelMapErr", fmt.Errorf("source panic: %v", r))}:
+					case <-ctx.Done():
+					}
+				}
+			}()
+			for v, err := range seq {
+				if ctx.Err() != nil {
+					return
+				}
+				if err != nil {
+					select {
+					case results <- result[U]{err: vortex.Wrap("parallel.ParallelMapErr", err)}:
+					case <-ctx.Done():
+					}
+					continue
+				}
+				select {
+				case jobs <- v:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+
+		go func() {
+			wg.Wait()
+			close(results)
+		}()
+
+		for {
+			if ctx.Err() != nil {
+				var zero U
+				yield(zero, vortex.WrapCancelled("parallel.ParallelMapErr"))
+				return
+			}
+			r, ok := <-results
+			if !ok {
+				return
+			}
+			if r.err != nil {
+				var zero U
+				if !yield(zero, r.err) {
+					cancel()
+					return
+				}
+				continue
+			}
+			if !yield(r.value, nil) {
+				cancel()
+				return
+			}
+		}
+	}
+}
+
+// OrderedParallelMapErr applies fn concurrently with `workers` goroutines
+// and yields results and errors in the original input order. Errors
+// (from seq, fn, or worker panics) occupy the slot where the failing
+// item would have been; surrounding items are not shifted.
+//
+// fn must be safe to call concurrently. A panic inside fn is recovered
+// and surfaced as a worker error so it cannot crash the program.
+func OrderedParallelMapErr[T, U any](
+	ctx context.Context,
+	seq iter.Seq2[T, error],
+	fn func(T) (U, error),
+	workers int,
+) iter.Seq2[U, error] {
+	if workers <= 0 {
+		panic("vortex: workers must be > 0")
+	}
+	return func(yield func(U, error) bool) {
+		if ctx.Err() != nil {
+			var zero U
+			yield(zero, vortex.WrapCancelled("parallel.OrderedParallelMapErr"))
+			return
+		}
+
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		// tasks buffer is workers (not workers*2) to bound in-flight items and
+		// prevent unbounded memory growth in the ordering buffer under skewed latencies.
+		tasks := make(chan task[T], workers)
+		results := make(chan result[U], workers*2)
+
+		var wg sync.WaitGroup
+
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				var currentIndex int
+				defer func() {
+					if r := recover(); r != nil {
+						select {
+						case results <- result[U]{index: currentIndex, err: vortex.Wrap("parallel.OrderedParallelMapErr", fmt.Errorf("worker panic: %v", r))}:
+						case <-ctx.Done():
+						}
+					}
+				}()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case t, ok := <-tasks:
+						if !ok {
+							return
+						}
+						currentIndex = t.index
+						u, err := fn(t.value)
+						if err != nil {
+							select {
+							case results <- result[U]{index: t.index, err: vortex.Wrap("parallel.OrderedParallelMapErr", err)}:
+							case <-ctx.Done():
+								return
+							}
+							continue
+						}
+						select {
+						case results <- result[U]{index: t.index, value: u}:
+						case <-ctx.Done():
+							return
+						}
+					}
+				}
+			}()
+		}
+
+		go func() {
+			defer close(tasks)
+			i := 0
+			defer func() {
+				if r := recover(); r != nil {
+					select {
+					case results <- result[U]{index: i, err: vortex.Wrap("parallel.OrderedParallelMapErr", fmt.Errorf("source panic: %v", r))}:
+					case <-ctx.Done():
+					}
+				}
+			}()
+
+			for v, err := range seq {
+				if ctx.Err() != nil {
+					return
+				}
+				if err != nil {
+					select {
+					case results <- result[U]{index: i, err: vortex.Wrap("parallel.OrderedParallelMapErr", err)}:
+						i++
+					case <-ctx.Done():
+						return
+					}
+					continue
+				}
+
+				select {
+				case tasks <- task[T]{index: i, value: v}:
+					i++
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+
+		go func() {
+			wg.Wait()
+			close(results)
+		}()
+
+		next := 0
+		buffer := map[int]result[U]{}
+
+		for {
+			select {
+			case <-ctx.Done():
+				var zero U
+				yield(zero, vortex.WrapCancelled("parallel.OrderedParallelMapErr"))
+				return
+			case r, ok := <-results:
+				if !ok {
+					return
+				}
+
+				buffer[r.index] = r
+
+				for {
+					buffered, exists := buffer[next]
+					if !exists {
+						break
+					}
+
+					delete(buffer, next)
+
+					if buffered.err != nil {
+						var zero U
+						if !yield(zero, buffered.err) {
+							cancel()
+							return
+						}
+					} else if !yield(buffered.value, nil) {
+						cancel()
+						return
+					}
+
+					next++
+				}
+			}
+		}
+	}
+}
+
+// ParallelMapSeqErr is like ParallelMapErr but takes a plain iter.Seq[T].
+// fn errors and worker panics are surfaced through the returned
+// iter.Seq2[U, error]. Output order is unspecified.
+func ParallelMapSeqErr[T, U any](
+	ctx context.Context,
+	seq iter.Seq[T],
+	fn func(T) (U, error),
+	workers int,
+) iter.Seq2[U, error] {
+	return ParallelMapErr(ctx, seqToSeq2(seq), fn, workers)
+}
+
+// OrderedParallelMapSeqErr is the ordered variant of ParallelMapSeqErr.
+// Results are yielded in input order. fn errors and worker panics are
+// surfaced through the returned iter.Seq2[U, error].
+func OrderedParallelMapSeqErr[T, U any](
+	ctx context.Context,
+	seq iter.Seq[T],
+	fn func(T) (U, error),
+	workers int,
+) iter.Seq2[U, error] {
+	return OrderedParallelMapErr(ctx, seqToSeq2(seq), fn, workers)
 }

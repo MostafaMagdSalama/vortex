@@ -11,6 +11,11 @@ import (
 )
 
 // Lines returns a lazy sequence of lines from any io.Reader.
+//
+// Cancellation: ctx is checked between lines. A blocked read on the underlying
+// io.Reader (e.g. a slow HTTP body) will not be interrupted by ctx alone —
+// close the reader to unblock it. For HTTP, cancel the request context or call
+// resp.Body.Close from another goroutine.
 func Lines(ctx context.Context, r io.Reader) iter.Seq2[string, error] {
 	return func(yield func(string, error) bool) {
 		scanner := bufio.NewScanner(r)
@@ -39,6 +44,9 @@ func Lines(ctx context.Context, r io.Reader) iter.Seq2[string, error] {
 }
 
 // FileLines opens a file and returns a lazy sequence of its lines.
+//
+// Cancellation: ctx is checked between lines. Closing the file from another
+// goroutine will also interrupt a blocked read.
 func FileLines(ctx context.Context, path string) iter.Seq2[string, error] {
 	return func(yield func(string, error) bool) {
 		if ctx.Err() != nil {

@@ -8,6 +8,11 @@ import (
 )
 
 // DistinctSeq filters out duplicate values keeping only the first occurrence.
+//
+// Memory: O(unique items). The internal seen-set grows for the lifetime of the
+// iteration and is not bounded. For high-cardinality streams, consider chunking
+// with iterx.Chunk and deduplicating per chunk, or use a probabilistic structure
+// outside the pipeline.
 func DistinctSeq[T comparable](ctx context.Context, seq iter.Seq[T]) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		seen := make(map[T]bool)
@@ -28,6 +33,11 @@ func DistinctSeq[T comparable](ctx context.Context, seq iter.Seq[T]) iter.Seq[T]
 
 // Distinct filters out duplicate values keeping only the first occurrence.
 // Errors from the underlying sequence are passed through untouched.
+//
+// Memory: O(unique items). The internal seen-set grows for the lifetime of the
+// iteration and is not bounded. For high-cardinality streams, consider chunking
+// with iterx.Chunk and deduplicating per chunk, or use a probabilistic structure
+// outside the pipeline.
 func Distinct[T comparable](ctx context.Context, seq iter.Seq2[T, error]) iter.Seq2[T, error] {
 	return func(yield func(T, error) bool) {
 		seen := make(map[T]bool)

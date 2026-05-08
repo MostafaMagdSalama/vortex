@@ -22,4 +22,21 @@
 // workers are used, and they stop quickly when the context is cancelled or the
 // consumer stops early. BatchMapSeq and BatchMap preserve batch order and do
 // not spin up worker goroutines by themselves.
+//
+// # Error-returning variants
+//
+// ParallelMapErr, OrderedParallelMapErr, ParallelMapSeqErr, and
+// OrderedParallelMapSeqErr accept fn func(T) (U, error). Errors returned by fn
+// are wrapped with vortex.Wrap and yielded inline alongside source-sequence
+// errors. The pipeline is not terminated when fn returns an error — processing
+// continues with the remaining items.
+//
+// # Panic safety
+//
+// Worker and source-sequence panics are recovered and surfaced as wrapped errors
+// through the returned iter.Seq2 (for Seq2 and *Err variants) or cause the
+// pipeline to cancel cleanly (for plain-Seq variants without an error channel).
+// A worker that panics exits without processing further items — the pool shrinks
+// by one for the rest of that call. Throughput degrades but ordering and error
+// delivery remain correct.
 package parallel

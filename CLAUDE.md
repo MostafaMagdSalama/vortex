@@ -38,12 +38,17 @@ The API is split by whether errors need to flow:
 - **Plain `iter.Seq[T]`** variants (suffix `Seq`): `FilterSeq`, `MapSeq`, `TakeSeq`, etc. — for error-free sequences (slices, custom generators).
 - **Error-aware `iter.Seq2[T, error]`** variants (no suffix): `Filter`, `Map`, `Take`, etc. — pass errors through untouched; counting functions (e.g. `Take`) only count non-error items.
 
-`Reverse` is the only function that buffers the full sequence. All others are O(1) memory.
+Most transformations are O(1) memory. The exceptions:
+- `Reverse` buffers the entire sequence to invert it.
+- `Distinct` keeps a set of every unique value seen so far (O(unique items)).
+- `Chunk` holds at most one batch of size n.
 
 ### `vortex/parallel` — Concurrent processing
 Three models, all with bounded goroutine pools and guaranteed cleanup on cancellation or early exit:
 - **`ParallelMap`/`ParallelMapSeq`** — unordered, best for I/O-bound operations.
+- **`ParallelMapErr`/`ParallelMapSeqErr`** — same but `fn` returns `(U, error)`; fn errors yielded inline.
 - **`OrderedParallelMap`/`OrderedParallelMapSeq`** — preserves input order (may buffer if workers finish out of order).
+- **`OrderedParallelMapErr`/`OrderedParallelMapSeqErr`** — ordered variant where `fn` returns `(U, error)`.
 - **`BatchMap`/`BatchMapSeq`** — sequential batching without goroutines, for bulk DB operations.
 
 ### `vortex/sources` — Data source adapters

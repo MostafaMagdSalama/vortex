@@ -184,6 +184,51 @@ func TestTake_CancelledContext(t *testing.T) {
 	}
 }
 
+func TestTake_ZeroDoesNotPullSource(t *testing.T) {
+	// Counts how many items the source was asked for. With n <= 0 the
+	// returned closure must short-circuit and never touch the source.
+	pulls := 0
+	src := func(yield func(int) bool) {
+		for i := 0; i < 5; i++ {
+			pulls++
+			if !yield(i) {
+				return
+			}
+		}
+	}
+
+	for range iterx.TakeSeq(context.Background(), src, 0) {
+		t.Fatal("TakeSeq(n=0) yielded an item")
+	}
+	if pulls != 0 {
+		t.Fatalf("TakeSeq(n=0) pulled %d items from source, want 0", pulls)
+	}
+
+	pulls = 0
+	for range iterx.TakeSeq(context.Background(), src, -3) {
+		t.Fatal("TakeSeq(n=-3) yielded an item")
+	}
+	if pulls != 0 {
+		t.Fatalf("TakeSeq(n<0) pulled %d items from source, want 0", pulls)
+	}
+
+	pulls = 0
+	srcErr := func(yield func(int, error) bool) {
+		for i := 0; i < 5; i++ {
+			pulls++
+			if !yield(i, nil) {
+				return
+			}
+		}
+	}
+	for range iterx.Take(context.Background(), srcErr, 0) {
+		t.Fatal("Take(n=0) yielded an item")
+	}
+	if pulls != 0 {
+		t.Fatalf("Take(n=0) pulled %d items from source, want 0", pulls)
+	}
+}
+
 func TestTake_StopsEarly(t *testing.T) {
 	var got []int
 	for v, err := range iterx.Take(context.Background(), seqToSeq2(slices.Values([]int{1, 2, 3, 4, 5})), 10) {
