@@ -31,7 +31,6 @@ func Lines(ctx context.Context, r io.Reader) iter.Seq2[string, error] {
 
 		if err := scanner.Err(); err != nil {
 			if ctx.Err() != nil {
-				yield("", vortex.WrapCancelled("sources.Lines"))
 				return
 			}
 			yield("", vortex.Wrap("sources.Lines", err))

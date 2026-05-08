@@ -448,6 +448,108 @@ func TestOrderedParallelMapSeq_Race(t *testing.T) {
 	}
 }
 
+func TestParallelMapSeq_ZeroWorkersPanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic for workers=0, got none")
+		}
+	}()
+	parallel.ParallelMapSeq(context.Background(), slices.Values([]int{}), func(n int) int { return n }, 0)
+}
+
+func TestParallelMap_ZeroWorkersPanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic for workers=0, got none")
+		}
+	}()
+	parallel.ParallelMap(context.Background(), seq2FromSlice([]int{}), func(n int) int { return n }, 0)
+}
+
+func TestOrderedParallelMapSeq_ZeroWorkersPanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic for workers=0, got none")
+		}
+	}()
+	parallel.OrderedParallelMapSeq(context.Background(), slices.Values([]int{}), func(n int) int { return n }, 0)
+}
+
+func TestOrderedParallelMap_ZeroWorkersPanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic for workers=0, got none")
+		}
+	}()
+	parallel.OrderedParallelMap(context.Background(), seq2FromSlice([]int{}), func(n int) int { return n }, 0)
+}
+
+func TestBatchMapSeq_ZeroBatchSizePanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic for batchSize=0, got none")
+		}
+	}()
+	parallel.BatchMapSeq(context.Background(), slices.Values([]int{}), func(b []int) []int { return b }, 0)
+}
+
+func TestBatchMap_ZeroBatchSizePanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic for batchSize=0, got none")
+		}
+	}()
+	parallel.BatchMap(context.Background(), seq2FromSlice([]int{}), func(b []int) []int { return b }, 0)
+}
+
+func TestParallelMap_WorkerPanicPropagatesAsError(t *testing.T) {
+	seq := seq2FromSlice([]int{1, 2, 3, 4, 5})
+
+	var gotErr error
+	for _, err := range parallel.ParallelMap(context.Background(), seq, func(n int) int {
+		if n == 3 {
+			panic("intentional panic in worker")
+		}
+		return n * 10
+	}, 2) {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+
+	if gotErr == nil {
+		t.Fatal("expected error from worker panic, got nil")
+	}
+	if !strings.Contains(gotErr.Error(), "worker panic") {
+		t.Fatalf("expected 'worker panic' in error, got: %v", gotErr)
+	}
+}
+
+func TestOrderedParallelMap_WorkerPanicPropagatesAsError(t *testing.T) {
+	seq := seq2FromSlice([]int{1, 2, 3, 4, 5})
+
+	var gotErr error
+	for _, err := range parallel.OrderedParallelMap(context.Background(), seq, func(n int) int {
+		if n == 3 {
+			panic("intentional panic in ordered worker")
+		}
+		return n * 10
+	}, 2) {
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+
+	if gotErr == nil {
+		t.Fatal("expected error from worker panic, got nil")
+	}
+	if !strings.Contains(gotErr.Error(), "worker panic") {
+		t.Fatalf("expected 'worker panic' in error, got: %v", gotErr)
+	}
+}
+
 func ExampleOrderedParallelMapSeq_strings() {
 	ctx := context.Background()
 	words := slices.Values([]string{"hello", "world", "foo"})

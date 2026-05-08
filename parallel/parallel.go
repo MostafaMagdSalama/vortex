@@ -2,6 +2,7 @@ package parallel
 
 import (
 	"context"
+	"fmt"
 	"iter"
 	"sync"
 
@@ -21,6 +22,9 @@ type result[U any] struct {
 
 // ParallelMapSeq processes each element concurrently with n workers.
 func ParallelMapSeq[T, U any](ctx context.Context, seq iter.Seq[T], fn func(T) U, workers int) iter.Seq[U] {
+	if workers <= 0 {
+		panic("vortex: workers must be > 0")
+	}
 	return func(yield func(U) bool) {
 		if ctx.Err() != nil {
 			return
@@ -92,10 +96,13 @@ func ParallelMapSeq[T, U any](ctx context.Context, seq iter.Seq[T], fn func(T) U
 // ParallelMap processes each element concurrently with n workers.
 // Errors from the underlying sequence are passed through untouched.
 func ParallelMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func(T) U, workers int) iter.Seq2[U, error] {
+	if workers <= 0 {
+		panic("vortex: workers must be > 0")
+	}
 	return func(yield func(U, error) bool) {
 		if ctx.Err() != nil {
 			var zero U
-			yield(zero, vortex.Wrap("parallel.ParallelMap", ctx.Err()))
+			yield(zero, vortex.WrapCancelled("parallel.ParallelMap"))
 			return
 		}
 
@@ -109,6 +116,14 @@ func ParallelMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						select {
+						case results <- result[U]{err: vortex.Wrap("parallel.ParallelMap", fmt.Errorf("worker panic: %v", r))}:
+						case <-ctx.Done():
+						}
+					}
+				}()
 				for {
 					select {
 					case <-ctx.Done():
@@ -181,6 +196,9 @@ func ParallelMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func
 
 // BatchMapSeq groups items into batches of size n and processes each batch.
 func BatchMapSeq[T, U any](ctx context.Context, seq iter.Seq[T], fn func([]T) []U, batchSize int) iter.Seq[U] {
+	if batchSize <= 0 {
+		panic("vortex: batchSize must be > 0")
+	}
 	return func(yield func(U) bool) {
 		var batch []T
 
@@ -216,13 +234,18 @@ func BatchMapSeq[T, U any](ctx context.Context, seq iter.Seq[T], fn func([]T) []
 			}
 		}
 
-		flush()
+		if !flush() {
+			return
+		}
 	}
 }
 
 // BatchMap groups items into batches of size n and processes each batch.
 // Errors from the underlying sequence are yielded inline and do not enter batches.
 func BatchMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func([]T) []U, batchSize int) iter.Seq2[U, error] {
+	if batchSize <= 0 {
+		panic("vortex: batchSize must be > 0")
+	}
 	return func(yield func(U, error) bool) {
 		var batch []T
 
@@ -274,7 +297,9 @@ func BatchMap[T, U any](ctx context.Context, seq iter.Seq2[T, error], fn func([]
 			}
 		}
 
-		flush()
+		if !flush() {
+			return
+		}
 	}
 }
 
@@ -286,6 +311,9 @@ func OrderedParallelMapSeq[T, U any](
 	fn func(T) U,
 	workers int,
 ) iter.Seq[U] {
+	if workers <= 0 {
+		panic("vortex: workers must be > 0")
+	}
 	return func(yield func(U) bool) {
 		if ctx.Err() != nil {
 			return
@@ -294,7 +322,9 @@ func OrderedParallelMapSeq[T, U any](
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		tasks := make(chan task[T], workers*2)
+		// tasks buffer is workers (not workers*2) to bound in-flight items and prevent
+		// unbounded memory growth in the ordering buffer under skewed latencies.
+		tasks := make(chan task[T], workers)
 		results := make(chan result[U], workers*2)
 
 		var wg sync.WaitGroup
@@ -304,7 +334,6 @@ func OrderedParallelMapSeq[T, U any](
 
 			go func() {
 				defer wg.Done()
-
 				for {
 					select {
 					case <-ctx.Done():
@@ -387,17 +416,22 @@ func OrderedParallelMap[T, U any](
 	fn func(T) U,
 	workers int,
 ) iter.Seq2[U, error] {
+	if workers <= 0 {
+		panic("vortex: workers must be > 0")
+	}
 	return func(yield func(U, error) bool) {
 		if ctx.Err() != nil {
 			var zero U
-			yield(zero, vortex.Wrap("parallel.OrderedParallelMap", ctx.Err()))
+			yield(zero, vortex.WrapCancelled("parallel.OrderedParallelMap"))
 			return
 		}
 
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		tasks := make(chan task[T], workers*2)
+		// tasks buffer is workers (not workers*2) to bound in-flight items and prevent
+		// unbounded memory growth in the ordering buffer under skewed latencies.
+		tasks := make(chan task[T], workers)
 		results := make(chan result[U], workers*2)
 
 		var wg sync.WaitGroup
@@ -407,7 +441,15 @@ func OrderedParallelMap[T, U any](
 
 			go func() {
 				defer wg.Done()
-
+				var currentIndex int
+				defer func() {
+					if r := recover(); r != nil {
+						select {
+						case results <- result[U]{index: currentIndex, err: vortex.Wrap("parallel.OrderedParallelMap", fmt.Errorf("worker panic: %v", r))}:
+						case <-ctx.Done():
+						}
+					}
+				}()
 				for {
 					select {
 					case <-ctx.Done():
@@ -417,6 +459,7 @@ func OrderedParallelMap[T, U any](
 							return
 						}
 
+						currentIndex = t.index
 						r := fn(t.value)
 
 						select {
