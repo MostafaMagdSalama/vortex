@@ -155,6 +155,7 @@ func TestFlatten_CancelledContext(t *testing.T) {
 
 func TestFlatten_CancelledDuringInner(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	seq := func(yield func([]int, error) bool) {
 		if !yield([]int{1, 2, 3}, nil) {
 			return

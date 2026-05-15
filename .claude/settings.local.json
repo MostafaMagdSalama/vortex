@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go run *)",
+      "Bash(go test *)",
+      "Bash(go tool *)",
+      "Bash(git add *)",
+      "Bash(cmd *)",
+      "PowerShell(Get-ChildItem *)",
+      "Bash(go version *)",
+      "Bash(go vet *)",
+      "Bash(go build *)",
+      "Bash(go install *)",
+      "Bash(~/go/bin/staticcheck ./...)",
+      "Bash(go doc *)",
+      "Bash(grep -iE \"\\(coverage|implementation_plan|gocache|\\\\.xlsx|\\\\.db$\\)\")",
+      "Bash(git rm *)"
+    ]
+  }
+}

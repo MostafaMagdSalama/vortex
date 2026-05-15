@@ -3,6 +3,7 @@ package sources
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"iter"
 
 	"github.com/MostafaMagdSalama/vortex"
@@ -83,6 +84,14 @@ func DBRows[T any](ctx context.Context, db querier, query string, scan func(*sql
 		// rows.Next() returns false on both clean completion AND error
 		// without this check a dropped connection looks like clean completion
 		if err := rows.Err(); err != nil {
+			// database/sql's closer goroutine may surface ctx cancellation
+			// as rows.Err()==context.Canceled before our top-of-loop ctx
+			// check fires. Translate to ErrCancelled so callers can rely
+			// on errors.Is(err, vortex.ErrCancelled).
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				yield(zero, vortex.WrapCancelled("sources.DBRows"))
+				return
+			}
 			yield(zero, vortex.Wrap("sources.DBRows", err))
 		}
 	}

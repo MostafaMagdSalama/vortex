@@ -157,6 +157,7 @@ func TestReverseSeq_StopsEarly(t *testing.T) {
 
 func TestReverseSeq_CancelledDuringYield(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	var got []int
 	for v := range iterx.ReverseSeq(ctx, slices.Values([]int{1, 2, 3, 4, 5})) {
 		got = append(got, v)
@@ -227,6 +228,7 @@ func TestReverse_CancelledDuringCollection(t *testing.T) {
 
 func TestReverse_CancelledDuringYield(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	var got []int
 	var gotErr error
 	for v, err := range iterx.Reverse(ctx, seqToSeq2(slices.Values([]int{1, 2, 3}))) {

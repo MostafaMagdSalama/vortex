@@ -266,6 +266,7 @@ func TestForEachSeq_CancelledMidIteration(t *testing.T) {
 
 func TestFlattenSeq_CancelledDuringInner(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	innerCount := 0
 	seq := func(yield func([]int) bool) {
 		for _, s := range [][]int{{1, 2, 3}, {4, 5, 6}} {

@@ -206,6 +206,7 @@ func TestZip_CancelledContext(t *testing.T) {
 
 func TestZip_CancelledInErrorLoopA(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	errA := errors.New("error from a")
 	a := func(yield func(string, error) bool) {
 		if !yield("", errA) {
@@ -228,6 +229,7 @@ func TestZip_CancelledInErrorLoopA(t *testing.T) {
 
 func TestZip_CancelledInErrorLoopB(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	errB := errors.New("error from b")
 	a := seqToSeq2(slices.Values([]string{"a1", "a2"}))
 	b := func(yield func(int, error) bool) {

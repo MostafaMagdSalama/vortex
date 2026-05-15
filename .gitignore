@@ -15,6 +15,7 @@
 # go build cache
 /vendor/
 /dist/
+.gocache/
 
 # dependency directories
 go.sum.bak
